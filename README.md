@@ -7,7 +7,7 @@ Each test simulates a real coding task, and results are divided into multiple st
 
 ## Tests structure
 
-Each test has his directory under `/tests`. Inside each test, you'll find the following files:
+Each test has its directory under `/tests`. Inside each test, you'll find the following files:
 
 - `prompts.md` The prompts for that test for each stage, exactly as they're fed into the LLMs.
 - `benchmarks.md` Benchmark results for each tested provider/model combination for that test.
@@ -28,12 +28,12 @@ This is the directory structure for the test `live-message-wall`:
                     /stage-1-first-run
                     /stage-2-advanced-features
                     /stage-3-refinements
-                    /stage-4-complex-features
+                    /stage-4-complex-refinements
                 /claude-code-pro-sonnet-4.6-high-effort
                     /stage-1-first-run
                     /stage-2-advanced-features
                     /stage-3-refinements
-                    /stage-4-complex-features
+                    /stage-4-complex-refinements
 ```
 
 ## Contribute
