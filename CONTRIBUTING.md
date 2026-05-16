@@ -81,18 +81,35 @@ If your github username were `anthony` and you ran the first two stages of the `
 
 1. Create a directory under `/tests/<your test name>/` (use `kebab-case`).
 
-2. Add a `test.yaml` file. Use [`/tests/live-message-wall/test.yaml`](/tests/live-message-wall/test.yaml) as a reference. Required fields:
-
-   - `name` — the test's directory name.
-   - `title` — a short, human-readable title.
-   - `description` — a short description of what the test simulates.
-   - `domain` (optional) — one of: `full-stack-web`, `backend`, `frontend`, `cli`, `mobile`, `data`, `library`, `other`.
-   - `stages` — an ordered list, each with:
-     - `id` — matches the stage directory name in contributed runs (use `stage-N-<short-theme>`).
-     - `theme` — one of: `bootstrap`, `features`, `refinements`, `refactor`, `extension`, `performance`, `security`, `other`.
-     - `prompt` — the prompt verbatim, as it will be fed into the LLM (use a `|` block scalar to preserve formatting).
-     - `builds_on` (optional, for stages 2+) — the `id` of the stage this one continues from.
+2. Add a `test.yaml` file describing the test and each stage's prompt. See the schema below, or use [`/tests/live-message-wall/test.yaml`](/tests/live-message-wall/test.yaml) as a reference.
 
    > Recommended: start with a simpler `stage-1-first-run`, then add complexity in consecutive stages to strain the model.
 
 3. If you also want to contribute your own runs of this new test, follow the steps in the previous section.
+
+### `test.yaml` schema
+
+```yaml
+name: live-message-wall         # matches the test's directory name
+title: A live message wall      # short, human-readable title
+description: |                  # one or two sentences describing what the test simulates
+  A real-time, anonymous message wall web app with a TUI-inspired aesthetic.
+  Later stages add lazy loading, rate limiting, fading by age, and replies.
+
+domain: full-stack-web          # optional; one of: full-stack-web, backend, frontend, cli, mobile, data, library, other
+
+stages:                         # ordered list, each stage built on top of the previous
+  - id: stage-1-first-run       # kebab-case; matches the stage directory name contributed runs will use
+    theme: bootstrap            # one of: bootstrap, features, refinements, refactor, extension, performance, security, other
+    prompt: |                   # the prompt verbatim, as it will be fed to the LLM (use `|` to preserve newlines)
+      Build a web application called "Wall" where visitors can leave a message
+      that gets instantly published on the wall for others to see.
+      ...
+
+  - id: stage-2-advanced-features
+    builds_on: stage-1-first-run    # optional, for stages 2+; the id of the stage this one continues from
+    theme: features
+    prompt: |
+      Add a couple thousand random messages for testing.
+      Make the wall lazy loading ...
+```
