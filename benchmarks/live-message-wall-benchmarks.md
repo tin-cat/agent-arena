@@ -1,5 +1,4 @@
-# Benchmark results
-Results of the time and spend on first runs. Includes time spent on running tools, reading and accepting confirmations.
+# live-message-wall
 
 ## first-run
 Provider|Model|Settings|Time|Tokens out|Cost|Conclusion
