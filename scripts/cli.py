@@ -112,8 +112,10 @@ from datetime import date
 from io import StringIO
 from typing import Any, Literal, Optional
 
+import click
 import questionary
 import typer
+import typer.core
 from pydantic import BaseModel, Field, ValidationError, model_validator
 from rich import box
 from rich.console import Console, Group
@@ -130,6 +132,14 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TESTS_DIR = REPO_ROOT / "tests"
+
+LOGO = (
+    "[cyan]   ▄▄▄▄▄▄▄▄  [/]\n"
+    "[cyan]  ▐█ [/][bold magenta]▀▄▄▀[/][cyan] █▌ [/]\n"
+    "[cyan]  ▐█  ▀▀  █▌ [/]\n"
+    "[cyan]   ▀██████▀  [/]\n"
+    "[cyan]    ▄▀  ▀▄   [/]"
+)
 
 RATINGS = ("excellent", "good", "partial", "failed")
 RATING_GLYPH = {
@@ -425,12 +435,52 @@ def read_pasted_text(label: str) -> str:
 # --------------------------------------------------------------------------- #
 
 
+def _walk_commands(group: click.Group, prefix: str = ""):
+    """Yield (path, signature, help_text) for every leaf command, in registration order."""
+    for name, cmd in group.commands.items():
+        path = f"{prefix} {name}".strip()
+        if isinstance(cmd, click.Group):
+            yield from _walk_commands(cmd, path)
+            continue
+        arg_parts = []
+        for p in cmd.params:
+            if isinstance(p, click.Argument):
+                meta = p.metavar or p.name.upper()
+                arg_parts.append(f"<{meta}>" if p.required else f"[{meta}]")
+        signature = " ".join([path, *arg_parts]) if arg_parts else path
+        yield (path, signature, cmd.help or "")
+
+
+class _MainHelpGroup(typer.core.TyperGroup):
+    """Custom main-app help: prints a flat tree of every subcommand, with no
+    typer-generated usage/description block (those live in the banner)."""
+
+    def format_help(self, ctx, formatter):  # noqa: ARG002
+        table = Table.grid(padding=(0, 4))
+        table.add_column(style="bold cyan", no_wrap=True)
+        table.add_column()
+
+        prev_top = None
+        for path, signature, help_text in _walk_commands(self):
+            top = path.split()[0]
+            if prev_top is not None and top != prev_top:
+                table.add_row("", "")
+            prev_top = top
+            table.add_row(signature, help_text)
+
+        console.print("[bold]Commands[/bold]")
+        console.print(table)
+        console.print(
+            "\n[dim]Run [bold]scripts/cli.py <COMMAND> --help[/bold] for full details on any command.[/dim]"
+        )
+
+
 app = typer.Typer(
     name="aact",
-    help="Manage AI agentic coding tests and their runs.",
     no_args_is_help=True,
     add_completion=False,
     rich_markup_mode="rich",
+    cls=_MainHelpGroup,
 )
 test_app = typer.Typer(help="Test definitions.", no_args_is_help=True)
 run_app = typer.Typer(help="Test runs (contributed results).", no_args_is_help=True)
@@ -1088,7 +1138,29 @@ def validate_cmd(
 # --------------------------------------------------------------------------- #
 
 
+def _print_banner() -> None:
+    description = "Manage AI agentic coding tests and their runs."
+    usage = "Usage: scripts/cli.py [OPTIONS] COMMAND [ARGS]..."
+    right = (
+        "\n"
+        f"[bold]{description}[/bold]\n"
+        "\n"
+        f"[dim]{usage}[/dim]"
+    )
+    grid = Table.grid(padding=(0, 3))
+    grid.add_column()
+    grid.add_column()
+    grid.add_row(LOGO, right)
+
+    console.print()
+    console.print(grid)
+    console.print()
+
+
 if __name__ == "__main__":
+    # Show the banner on help screens and on no-args invocation (which prints help).
+    if len(sys.argv) == 1 or any(a in ("--help", "-h") for a in sys.argv[1:]):
+        _print_banner()
     try:
         app()
     except KeyboardInterrupt:
