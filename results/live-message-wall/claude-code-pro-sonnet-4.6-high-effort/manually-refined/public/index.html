@@ -17,6 +17,7 @@
       --green-dim: #1a4731;
       --blue:      #38bdf8;
       --card-w:    27ch;
+      --ruler-h:   18px;
       --card-h:    10.5em;
       --bar-h:     36px;
       --status-h:  20px;
@@ -123,6 +124,8 @@
 
     #wall-outer {
       flex: 1;
+      display: flex;
+      flex-direction: column;
       overflow-x: auto;
       overflow-y: hidden;
       scrollbar-width: thin;
@@ -133,12 +136,41 @@
     #wall-outer::-webkit-scrollbar-track { background: var(--bg); }
     #wall-outer::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
 
+    #date-ruler {
+      flex-shrink: 0;
+      height: var(--ruler-h);
+      position: relative;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      align-self: stretch;
+    }
+
+    .date-tick {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+      padding-right: 10px;
+      font-size: 10px;
+      color: var(--dim);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .date-tick + .date-tick {
+      border-left: 1px solid var(--border);
+    }
+
     #wall {
       display: flex;
       flex-direction: column;
       flex-wrap: wrap;
       align-content: flex-start;
-      height: 100%;
+      flex: 1;
+      min-height: 0;
+      align-self: flex-start;
       gap: 7px;
       padding: 8px 10px;
     }
@@ -363,6 +395,7 @@
 
 <!-- Wall -->
 <div id="wall-outer">
+  <div id="date-ruler"></div>
   <div id="wall">
     <span id="empty">no messages yet. be the first.</span>
     <div id="load-more"></div>
@@ -395,6 +428,7 @@
   const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
   const toast      = document.getElementById('toast');
+  const dateRuler  = document.getElementById('date-ruler');
   const wallOuter  = document.getElementById('wall-outer');
   const wall       = document.getElementById('wall');
   const empty      = document.getElementById('empty');
@@ -410,6 +444,7 @@
   const modalClose = document.getElementById('modal-close');
 
   let toastTimer = null;
+  let rulerRebuildTimer = null;
   let loadedCount = 0;
   let totalCount = 0;
   let oldestTimestamp = null;
@@ -454,6 +489,59 @@
     toastTimer = setTimeout(() => toast.classList.remove('visible'), ms);
   }
 
+  function fmtDateApprox(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = Math.round((today - msgDay) / 86400000);
+    if (diff <= 0) return 'today';
+    if (diff === 1) return 'yesterday';
+    if (diff < 7) return `${diff}d ago`;
+    return d.toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric',
+      year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+  }
+
+  function rebuildDateRuler() {
+    const cards = Array.from(wall.querySelectorAll('.card[data-ts]'));
+    dateRuler.innerHTML = '';
+    if (!cards.length) { dateRuler.style.minWidth = ''; return; }
+
+    // Sync ruler width with wall content width so both scroll together
+    dateRuler.style.minWidth = wall.scrollWidth + 'px';
+
+    const gap = 7;
+    const padLeft = 10;
+    const cardW = cards[0].offsetWidth;
+    const cardH = cards[0].offsetHeight;
+    const colW = cardW + gap;
+    const wallInnerH = wall.offsetHeight - 16; // subtract 8px top + 8px bottom padding
+    const cardsPerCol = Math.max(1, Math.floor((wallInnerH + gap) / (cardH + gap)));
+
+    let prevLabel = null;
+    for (let col = 0; ; col++) {
+      const idx = col * cardsPerCol;
+      if (idx >= cards.length) break;
+      const label = fmtDateApprox(cards[idx].dataset.ts);
+      if (label === prevLabel) continue;
+      prevLabel = label;
+      const tick = document.createElement('span');
+      tick.className = 'date-tick';
+      tick.textContent = label;
+      tick.style.left = (padLeft + col * colW) + 'px';
+      dateRuler.appendChild(tick);
+    }
+  }
+
+  function scheduleRulerRebuild() {
+    if (rulerRebuildTimer) return;
+    rulerRebuildTimer = setTimeout(() => { rulerRebuildTimer = null; rebuildDateRuler(); }, 150);
+  }
+
+  window.addEventListener('resize', scheduleRulerRebuild);
+
   function fmtTs(iso) {
     const d = new Date(iso);
     const pad = n => String(n).padStart(2,'0');
@@ -495,6 +583,7 @@
     loadedCount++;
     totalCount++;
     updateCount();
+    scheduleRulerRebuild();
   }
 
   function appendCard(msg) {
@@ -506,6 +595,7 @@
     if (msg.timestamp < (oldestTimestamp ?? '')) oldestTimestamp = msg.timestamp;
     else if (!oldestTimestamp) oldestTimestamp = msg.timestamp;
     updateCount();
+    scheduleRulerRebuild();
   }
 
   function updateCount() {
@@ -518,6 +608,7 @@
   // ── Opacity fading ─────────────────────────────────────
 
   function updateOpacities() {
+    let removed = false;
     const cards = wall.querySelectorAll('.card[data-ts]');
     cards.forEach(card => {
       const opacity = getOpacity(card.dataset.ts);
@@ -525,11 +616,13 @@
         card.remove();
         loadedCount = Math.max(0, loadedCount - 1);
         totalCount = Math.max(0, totalCount - 1);
+        removed = true;
         updateCount();
       } else {
         card.style.opacity = opacity;
       }
     });
+    if (removed) scheduleRulerRebuild();
   }
 
   setInterval(updateOpacities, 5 * 60 * 1000);

@@ -46,4 +46,12 @@ Links in messages are clickable in the modal.
 Add CSRF check to the message posting. Check messages for XSS and other hacks to prevent security bugs.
 
 Add a sticky header to the top of the horizontal scrolling list of messages that shows the approximate date of the messages at that vertical point of the list.
+
+All dates are stored and display in UTC.
+
+Allow emojis in messages.
+
+When clicking the top input to start writing a message, or when typing on it, the input becomes a big textarea to allow and entice the user to write long messages. Messages can be up to 4KB, ensure the limit is not surpassed.
+
+Add the ability to reply to messages with another message. Replies do not appear on the wall. Messages with replies have a button that states "N replies". When clicking the button, a modal appears with a vertical list of all replies, ordered from most recent to oldest. Replies cannot be replied.
 ```
