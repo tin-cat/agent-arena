@@ -6,3 +6,9 @@ Provider|Model|Settings|Time|Tokens out|Cost|Conclusion
 ---|---|---|---|---|---|---
 claude-code-pro|sonnet-4.6|`effort:high`|7:27|26.3k|$0.63|Perfect
 claude-code-pro|opus-4.7|||||
+
+## live-message-wall (advanced features)
+Provider|Model|Settings|Time|Tokens out|Cost|Conclusion
+---|---|---|---|---|---|---
+claude-code-pro|sonnet-4.6|`effort:high`||||
+claude-code-pro|opus-4.7|||||
