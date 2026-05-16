@@ -264,6 +264,30 @@
       pointer-events: none;
     }
 
+    .card-replies {
+      position: absolute;
+      bottom: 4px;
+      left: 6px;
+      font-size: 10px;
+      color: var(--dim);
+      background: none;
+      border: none;
+      font-family: var(--font);
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 100ms;
+    }
+
+    .card:hover .card-replies,
+    .card-replies--active {
+      opacity: 1;
+    }
+
+    .card-replies:hover { color: var(--blue); }
+
     .card-new {
       animation: card-in 250ms ease-out;
     }
@@ -366,6 +390,22 @@
     #modal-close:hover { color: var(--text); }
     #modal-close:focus-visible { color: var(--text); }
 
+    #modal-reply-btn {
+      background: none;
+      border: 1px solid var(--border-hi);
+      color: var(--dim);
+      font-family: var(--font);
+      font-size: 10px;
+      padding: 2px 8px;
+      cursor: pointer;
+      margin-left: auto;
+      white-space: nowrap;
+      outline: none;
+      transition: color 80ms, border-color 80ms;
+    }
+
+    #modal-reply-btn:hover { color: var(--blue); border-color: var(--blue); }
+
     #modal-body {
       padding: 10px;
       overflow-y: auto;
@@ -385,6 +425,158 @@
     }
 
     #modal-body a:hover { text-decoration: underline; }
+
+    /* ── Reply modal ─────────────────────────────────────── */
+
+    #reply-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .82);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #reply-overlay.open { display: flex; }
+
+    #reply-modal {
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      width: min(64ch, 90vw);
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #reply-modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #reply-modal-ts {
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    #reply-modal-close {
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-family: var(--font);
+      font-size: var(--fs);
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      outline: none;
+    }
+
+    #reply-modal-close:hover { color: var(--text); }
+    #reply-modal-close:focus-visible { color: var(--text); }
+
+    #reply-compose {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #reply-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      outline: none;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: var(--fs);
+      caret-color: var(--green);
+      line-height: 1.5;
+      resize: none;
+      height: 72px;
+      padding: 0 0 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) transparent;
+    }
+
+    #reply-input::placeholder { color: var(--dim); }
+
+    #reply-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    #reply-char-count {
+      color: var(--dim);
+      font-size: 10px;
+      min-width: 6ch;
+      text-align: right;
+    }
+
+    #reply-char-count.warn { color: #f59e0b; }
+    #reply-char-count.over { color: #f87171; }
+
+    #reply-post-btn {
+      background: transparent;
+      border: 1px solid var(--border-hi);
+      color: var(--green);
+      font-family: var(--font);
+      font-size: var(--fs);
+      padding: 3px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 80ms, border-color 80ms, background 80ms;
+    }
+
+    #reply-post-btn:hover:not(:disabled) { border-color: var(--green-dim); }
+    #reply-post-btn:active:not(:disabled) { background: rgba(74, 222, 128, .06); }
+    #reply-post-btn:disabled { cursor: default; color: #9a9a9a; }
+
+    #reply-list {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) transparent;
+    }
+
+    .reply-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .reply-item:last-child { border-bottom: none; }
+
+    .reply-ts {
+      font-size: 10px;
+      color: var(--dim);
+      margin-bottom: 3px;
+    }
+
+    .reply-text {
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      line-height: 1.6;
+    }
+
+    .reply-text a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .reply-text a:hover { text-decoration: underline; }
+
+    #reply-empty {
+      padding: 16px 10px;
+      color: var(--dim);
+      font-size: 11px;
+      text-align: center;
+    }
 
     /* ── Toast ───────────────────────────────────────────── */
 
@@ -453,9 +645,29 @@
   <div id="modal">
     <div id="modal-head">
       <span id="modal-ts"></span>
+      <button id="modal-reply-btn" style="display:none"></button>
       <button id="modal-close" aria-label="Close">[x]</button>
     </div>
     <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Reply Modal -->
+<div id="reply-overlay" role="dialog" aria-modal="true" aria-labelledby="reply-modal-ts">
+  <div id="reply-modal">
+    <div id="reply-modal-head">
+      <span id="reply-modal-ts"></span>
+      <button id="reply-modal-close" aria-label="Close">[x]</button>
+    </div>
+    <div id="reply-compose">
+      <textarea id="reply-input" maxlength="4096" placeholder="type a reply…"
+                autocomplete="off" spellcheck="false" aria-label="Reply"></textarea>
+      <div id="reply-actions">
+        <span id="reply-char-count">4096</span>
+        <button id="reply-post-btn">[ post reply ]</button>
+      </div>
+    </div>
+    <div id="reply-list"></div>
   </div>
 </div>
 
@@ -482,6 +694,17 @@
   const modalTs    = document.getElementById('modal-ts');
   const modalBody  = document.getElementById('modal-body');
   const modalClose = document.getElementById('modal-close');
+
+  const replyOverlay    = document.getElementById('reply-overlay');
+  const replyModalTs    = document.getElementById('reply-modal-ts');
+  const replyModalClose = document.getElementById('reply-modal-close');
+  const replyInput      = document.getElementById('reply-input');
+  const replyCharCount  = document.getElementById('reply-char-count');
+  const replyPostBtn    = document.getElementById('reply-post-btn');
+  const replyList       = document.getElementById('reply-list');
+
+  let currentReplyMsgId = null;
+  const messageData = new Map();
 
   let toastTimer = null;
   let rulerRebuildTimer = null;
@@ -606,16 +829,29 @@
     const div = document.createElement('div');
     div.className = 'card';
     div.dataset.ts = msg.timestamp;
+    div.dataset.id = msg.id;
     div.style.opacity = getOpacity(msg.timestamp);
+
+    const replyCount = msg.replyCount || 0;
+    const replyLabel = replyCount > 0
+      ? `${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
+      : 'reply';
     div.innerHTML =
       `<div class="card-head">${fmtTs(msg.timestamp)}</div>` +
       `<div class="card-body">${esc(msg.text)}</div>` +
-      `<span class="card-more">···</span>`;
+      `<span class="card-more">···</span>` +
+      `<button class="card-replies${replyCount > 0 ? ' card-replies--active' : ''}">${replyLabel}</button>`;
+
     div.addEventListener('click', () => openModal(msg));
+    div.querySelector('.card-replies').addEventListener('click', e => {
+      e.stopPropagation();
+      openRepliesModal(msg.id);
+    });
     return div;
   }
 
   function prependCard(msg) {
+    messageData.set(msg.id, msg);
     if (seen.has(msg.id)) return;
     seen.add(msg.id);
     removeEmpty();
@@ -629,6 +865,7 @@
   }
 
   function appendCard(msg) {
+    messageData.set(msg.id, msg);
     if (seen.has(msg.id)) return;
     seen.add(msg.id);
     removeEmpty();
@@ -716,7 +953,9 @@
 
   modalClose.addEventListener('click', closeModal);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModal(); closeRepliesModal(); }
+  });
 
   // ── Cooldown ───────────────────────────────────────────
 
@@ -890,6 +1129,11 @@
         updateCount();
       } else if (payload.type === 'message') {
         prependCard(payload);
+      } else if (payload.type === 'reply') {
+        const data = messageData.get(payload.messageId);
+        if (data) data.replyCount = payload.replyCount;
+        updateCardReplyCount(payload.messageId, payload.replyCount);
+        if (currentReplyMsgId === payload.messageId) loadReplies(payload.messageId);
       }
     };
 
@@ -900,6 +1144,122 @@
       setTimeout(connect, 3000);
     };
   }
+
+  // ── Reply modal ────────────────────────────────────────
+
+  function updateCardReplyCount(messageId, replyCount) {
+    const card = wall.querySelector(`.card[data-id="${messageId}"]`);
+    if (!card) return;
+    let btn = card.querySelector('.card-replies');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'card-replies';
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        openRepliesModal(messageId);
+      });
+      card.appendChild(btn);
+    }
+    const label = `${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`;
+    btn.textContent = label;
+    btn.classList.add('card-replies--active');
+  }
+
+  async function openRepliesModal(msgId) {
+    const msg = messageData.get(msgId);
+    if (!msg) return;
+    currentReplyMsgId = msgId;
+    replyModalTs.textContent = `replies to: ${fmtTs(msg.timestamp)}`;
+    replyInput.value = '';
+    replyCharCount.textContent = MAX_LEN;
+    replyCharCount.className = '';
+    replyList.innerHTML = '';
+    replyOverlay.classList.add('open');
+    replyInput.focus();
+    await loadReplies(msgId);
+  }
+
+  async function loadReplies(msgId) {
+    try {
+      const r = await fetch(`/messages/${encodeURIComponent(msgId)}/replies`);
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      renderReplies(data.replies);
+    } catch (_) {
+      replyList.innerHTML = '<div id="reply-empty">failed to load replies</div>';
+    }
+  }
+
+  function renderReplies(replies) {
+    if (!replies.length) {
+      replyList.innerHTML = '<div id="reply-empty">no replies yet.</div>';
+      return;
+    }
+    replyList.innerHTML = replies.map(r =>
+      `<div class="reply-item">` +
+      `<div class="reply-ts">${fmtTs(r.timestamp)}</div>` +
+      `<div class="reply-text">${linkify(r.text)}</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  function closeRepliesModal() {
+    replyOverlay.classList.remove('open');
+    currentReplyMsgId = null;
+  }
+
+  async function postReply() {
+    const text = replyInput.value.trim();
+    if (!text || text.length > MAX_LEN || !currentReplyMsgId) return;
+
+    replyPostBtn.disabled = true;
+    replyPostBtn.textContent = '[ posting… ]';
+
+    try {
+      const r = await fetch(`/messages/${encodeURIComponent(currentReplyMsgId)}/replies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfToken(),
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (r.ok) {
+        replyInput.value = '';
+        replyCharCount.textContent = MAX_LEN;
+        replyCharCount.className = '';
+        await loadReplies(currentReplyMsgId);
+      } else {
+        const data = await r.json().catch(() => ({}));
+        if (r.status === 429 && data.retryAfter) {
+          showToast(`Reply rate limited — try again in ${data.retryAfter}s`);
+        } else {
+          showToast(data.error || 'Could not post reply.');
+        }
+      }
+    } catch (_) {
+      showToast('Network error. Please try again.');
+    } finally {
+      replyPostBtn.disabled = false;
+      replyPostBtn.textContent = '[ post reply ]';
+      replyInput.focus();
+    }
+  }
+
+  replyModalClose.addEventListener('click', closeRepliesModal);
+  replyOverlay.addEventListener('click', e => { if (e.target === replyOverlay) closeRepliesModal(); });
+  replyPostBtn.addEventListener('click', postReply);
+
+  replyInput.addEventListener('input', () => {
+    const remaining = MAX_LEN - replyInput.value.length;
+    replyCharCount.textContent = remaining;
+    replyCharCount.className = remaining < 0 ? 'over' : remaining < 200 ? 'warn' : '';
+  });
+
+  replyInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) postReply();
+  });
 
   // Restore any in-progress draft from a previous session
   const storedDraft = localStorage.getItem('wallDraft');

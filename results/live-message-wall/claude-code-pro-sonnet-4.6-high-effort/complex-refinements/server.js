@@ -9,10 +9,16 @@ const PAGE_SIZE = 50;
 const TEN_MIN_MS = 10 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+const ONE_MIN_MS = 60 * 1000;
 
 const messages = []; // sorted newest-first
 const clients = new Set();
 const rateLimits = new Map(); // ip -> lastPostTimestamp
+const replyRateLimits = new Map(); // ip -> lastReplyTimestamp
+
+function serializeMsg(msg) {
+  return { id: msg.id, text: msg.text, timestamp: msg.timestamp, replyCount: msg.replies.length };
+}
 
 function parseCookies(req) {
   const cookies = {};
@@ -408,6 +414,7 @@ function seedMessages() {
       id: crypto.randomUUID(),
       text: SEED_POOL[i % SEED_POOL.length],
       timestamp: new Date(now - age).toISOString(),
+      replies: [],
     });
   }
   messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -435,6 +442,10 @@ setInterval(() => {
   for (const [key, ts] of rateLimits) {
     if (ts < cutoff) rateLimits.delete(key);
   }
+  const replyCutoff = Date.now() - ONE_MIN_MS;
+  for (const [key, ts] of replyRateLimits) {
+    if (ts < replyCutoff) replyRateLimits.delete(key);
+  }
 }, 60 * 1000);
 
 // ── Routes ─────────────────────────────────────────────────
@@ -450,7 +461,7 @@ app.get('/messages', (req, res) => {
   }
 
   res.json({
-    messages: messages.slice(startIdx, startIdx + limit),
+    messages: messages.slice(startIdx, startIdx + limit).map(serializeMsg),
     hasMore: startIdx + limit < messages.length,
     total: messages.length,
   });
@@ -468,7 +479,7 @@ app.get('/events', (req, res) => {
   };
 
   clients.add(send);
-  send({ type: 'init', messages: messages.slice(0, PAGE_SIZE), total: messages.length });
+  send({ type: 'init', messages: messages.slice(0, PAGE_SIZE).map(serializeMsg), total: messages.length });
 
   req.on('close', () => clients.delete(send));
 });
@@ -515,11 +526,64 @@ app.post('/messages', (req, res) => {
     id: crypto.randomUUID(),
     text,
     timestamp: new Date().toISOString(),
+    replies: [],
   };
 
   messages.unshift(msg);
 
-  for (const send of clients) send({ type: 'message', ...msg });
+  for (const send of clients) send({ type: 'message', ...serializeMsg(msg) });
+
+  res.status(201).json({ ok: true });
+});
+
+app.get('/messages/:id/replies', (req, res) => {
+  const msg = messages.find(m => m.id === req.params.id);
+  if (!msg) return res.status(404).json({ error: 'Message not found.' });
+  res.json({ replies: [...msg.replies].reverse() });
+});
+
+app.post('/messages/:id/replies', (req, res) => {
+  const csrfHeader = req.headers['x-csrf-token'];
+  if (!req.csrfToken || req.csrfToken !== csrfHeader) {
+    return res.status(403).json({ error: 'Invalid CSRF token.' });
+  }
+
+  const msg = messages.find(m => m.id === req.params.id);
+  if (!msg) return res.status(404).json({ error: 'Message not found.' });
+
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || req.socket.remoteAddress
+    || 'unknown';
+  const now = Date.now();
+  const ipKey = `ip:${ip}`;
+  const userKey = req.userId ? `user:${req.userId}` : null;
+
+  const lastPost = Math.max(
+    replyRateLimits.get(ipKey) || 0,
+    userKey ? (replyRateLimits.get(userKey) || 0) : 0,
+  );
+
+  if (lastPost && now - lastPost < ONE_MIN_MS) {
+    const retryAfter = Math.ceil((ONE_MIN_MS - (now - lastPost)) / 1000);
+    return res.status(429).json({ error: 'Rate limited.', retryAfter });
+  }
+
+  const body = req.body ?? {};
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+
+  if (!text) return res.status(400).json({ error: 'Reply text is required.' });
+  if (text.length > MAX_LEN) return res.status(400).json({ error: `Max ${MAX_LEN} characters.` });
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text)) {
+    return res.status(400).json({ error: 'Invalid reply content.' });
+  }
+
+  replyRateLimits.set(ipKey, now);
+  if (userKey) replyRateLimits.set(userKey, now);
+
+  const reply = { id: crypto.randomUUID(), text, timestamp: new Date().toISOString() };
+  msg.replies.push(reply);
+
+  for (const send of clients) send({ type: 'reply', messageId: msg.id, replyCount: msg.replies.length });
 
   res.status(201).json({ ok: true });
 });
