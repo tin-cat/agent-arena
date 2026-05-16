@@ -1,5 +1,5 @@
 # AI agentic coding test
-Understand how different LLM models and agentic coding platforms perform and behave in different scenarios, different coding tasks and different hardware.
+Understand how different LLM models and agentic coding platforms perform in different scenarios, different coding tasks and different hardware.
 
 This repository intends to provide you with a clearer view on real-world coding scenarios to help you decide which fits your coding needs better. For example, it will be really helpful if you're trying to decide whether a local inference setup or a cloud-based one is best for you.
 
@@ -25,6 +25,10 @@ This is the directory structure for the test `live-message-wall`:
         /results
             /tin-cat
                 /claude-code-pro-opus-4.7-high-effort
+                    /stage-1-first-run
+                    /stage-2-advanced-features
+                    /stage-3-refinements
+                    /stage-4-complex-features
                 /claude-code-pro-sonnet-4.6-high-effort
                     /stage-1-first-run
                     /stage-2-advanced-features
@@ -34,13 +38,3 @@ This is the directory structure for the test `live-message-wall`:
 
 ## Contribute
 Please feel free to contribute your tests to this repository. You can either contribute entire new tests, or your runs of existing tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-
-- **prompt** Is one of the prompts in `/prompts`, like `live-message-wall`
-- **provider** The provider used to run the model, for example: `claude-code`, `google-antigravity` or also local inference setups like `lmstudio-macbook-pro-m1-32gb`.
-- **model** The full model name, like `qwen3.6-35b-a3b`
-- **run** One of the following:
-    - `first-run` What came out after the first run.
-    - `advanced-features` What came out after asking for advanced features, in an entirely new session.
-    - `refinements` What came out after asking for refinements and bug solving if needed.
-    - `complex-refinements` What came out after asking for complex refinements and bug solving if needed.
