@@ -18,7 +18,7 @@ The easiest way is the CLI: `scripts/cli.py run add` and `scripts/cli.py test ad
 ### `run.yaml` schema
 
 ```yaml
-contributor: your-github-username
+contributor_url: https://github.com/your-username   # any URL identifying you (GitHub profile, personal site, Mastodon, etc.)
 date: 2026-05-16              # the day the run was performed (YYYY-MM-DD)
 
 agent:

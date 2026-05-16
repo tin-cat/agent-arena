@@ -116,7 +116,7 @@ import click
 import questionary
 import typer
 import typer.core
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from rich import box
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -226,7 +226,7 @@ class RunStage(BaseModel):
 
 
 class Run(BaseModel):
-    contributor: str
+    contributor_url: str                # URL identifying the contributor (GitHub profile, personal site, Mastodon, etc.)
     date: date                          # the day the run was performed (YYYY-MM-DD)
     agent: Agent
     provider: str
@@ -236,6 +236,14 @@ class Run(BaseModel):
     settings: dict[str, Any] = Field(default_factory=dict)
     hardware: Optional[Hardware] = None
     stages: list[RunStage]
+
+    @field_validator("contributor_url")
+    @classmethod
+    def _check_contributor_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("must be a URL starting with http:// or https://")
+        return v
 
     @model_validator(mode="after")
     def _require_framework_for_self_hosted(self) -> "Run":
@@ -376,6 +384,31 @@ def parse_iso_date(s: str) -> Optional[date]:
         return None
 
 
+def handle_from_url(url: str) -> str:
+    """Extract a short human-readable handle from a URL for use in slugs/displays.
+
+    Examples:
+      https://github.com/tin-cat        -> tin-cat
+      https://tin-cat.dev               -> tin-cat
+      https://twitter.com/tin-cat       -> tin-cat
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(url.strip())
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if path_parts:
+        return path_parts[-1]
+    netloc = parsed.netloc.removeprefix("www.")
+    return netloc.split(".")[0] if netloc else url
+
+
+def short_url(url: str) -> str:
+    """Strip the scheme for compact display in tables."""
+    for prefix in ("https://", "http://"):
+        if url.startswith(prefix):
+            return url[len(prefix):]
+    return url
+
+
 _KEBAB_RE = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 
 
@@ -451,28 +484,41 @@ def _walk_commands(group: click.Group, prefix: str = ""):
         yield (path, signature, cmd.help or "")
 
 
+def _print_main_help(root: click.Group) -> None:
+    """Print a flat tree of every command under the root group. This is the
+    one and only help screen — `--help` at any level routes here."""
+    table = Table.grid(padding=(0, 4))
+    table.add_column(style="bold cyan", no_wrap=True)
+    table.add_column()
+
+    prev_top = None
+    for path, signature, help_text in _walk_commands(root):
+        top = path.split()[0]
+        if prev_top is not None and top != prev_top:
+            table.add_row("", "")
+        prev_top = top
+        table.add_row(signature, help_text)
+
+    console.print("[bold]Commands[/bold]")
+    console.print(table)
+
+
 class _MainHelpGroup(typer.core.TyperGroup):
-    """Custom main-app help: prints a flat tree of every subcommand, with no
-    typer-generated usage/description block (those live in the banner)."""
+    """Main-app help renderer — delegates to the shared main-help printer."""
 
     def format_help(self, ctx, formatter):  # noqa: ARG002
-        table = Table.grid(padding=(0, 4))
-        table.add_column(style="bold cyan", no_wrap=True)
-        table.add_column()
+        _print_main_help(ctx.find_root().command)
 
-        prev_top = None
-        for path, signature, help_text in _walk_commands(self):
-            top = path.split()[0]
-            if prev_top is not None and top != prev_top:
-                table.add_row("", "")
-            prev_top = top
-            table.add_row(signature, help_text)
 
-        console.print("[bold]Commands[/bold]")
-        console.print(table)
-        console.print(
-            "\n[dim]Run [bold]scripts/cli.py <COMMAND> --help[/bold] for full details on any command.[/dim]"
-        )
+# Route every --help (at any level: subgroup, leaf command) to the same main
+# help screen. typer's rich_format_help is what every TyperGroup / TyperCommand
+# eventually calls when rendering --help, so patching it here covers them all.
+import typer.rich_utils as _typer_rich_utils
+
+def _all_help_is_main_help(*, obj, ctx, markup_mode):  # noqa: ARG001
+    _print_main_help(ctx.find_root().command)
+
+_typer_rich_utils.rich_format_help = _all_help_is_main_help
 
 
 app = typer.Typer(
@@ -592,7 +638,7 @@ def run_list_cmd(
             r = load_run(test_name, run_id)
             agent = r.agent.name + (f" ({r.agent.plan})" if r.agent.plan else "")
             stages_str = "  ".join(RATING_GLYPH.get(s.rating, "?") for s in r.stages)
-            table.add_row(run_id, r.date.isoformat(), r.contributor, agent, r.model, stages_str)
+            table.add_row(run_id, r.date.isoformat(), short_url(r.contributor_url), agent, r.model, stages_str)
         except (ValidationError, FileNotFoundError):
             table.add_row(run_id, "?", "?", "?", "?", "[red]invalid[/red]")
 
@@ -619,7 +665,7 @@ def run_show_cmd(
     meta = Table(box=None, show_header=False, padding=(0, 2))
     meta.add_column(style="dim", no_wrap=True)
     meta.add_column()
-    meta.add_row("Contributor", r.contributor)
+    meta.add_row("Contributor", r.contributor_url)
     meta.add_row("Date", r.date.isoformat())
     agent_str = r.agent.name + (f"  ({r.agent.plan})" if r.agent.plan else "")
     meta.add_row("Agent", agent_str)
@@ -701,9 +747,9 @@ def run_add_cmd() -> None:
     test_name = require(questionary.select("Which test did you run?", choices=tests).ask())
     test = load_test(test_name)
 
-    contributor = require(questionary.text(
-        "Your GitHub username:",
-        validate=_required,
+    contributor_url = require(questionary.text(
+        "Your personal URL (GitHub profile, website, Mastodon, etc.):",
+        validate=lambda v: v.strip().startswith(("http://", "https://")) or "Must be a URL starting with http:// or https://",
     ).ask()).strip()
 
     run_date_raw = require(questionary.text(
@@ -845,8 +891,8 @@ def run_add_cmd() -> None:
         console.print("[yellow]No stages recorded. Aborting.[/yellow]")
         raise typer.Exit(0)
 
-    # Suggest run-id
-    suggested = f"{contributor}-{agent_choice}-{model}"
+    # Suggest run-id (derived from contributor URL's handle)
+    suggested = f"{handle_from_url(contributor_url)}-{agent_choice}-{model}"
     if settings:
         settings_part = "-".join(f"{k}-{v}" for k, v in settings.items())
         suggested += f"-{settings_part}"
@@ -859,7 +905,7 @@ def run_add_cmd() -> None:
     ).ask()).strip()
 
     run = Run(
-        contributor=contributor,
+        contributor_url=contributor_url,
         date=run_date,
         agent=Agent(name=agent_choice, plan=agent_plan),
         provider=provider_choice,
@@ -1139,7 +1185,10 @@ def validate_cmd(
 
 
 def _print_banner() -> None:
-    description = "Manage AI agentic coding tests and their runs."
+    description = (
+        "Benchmarks for LLM models and agentic coding platforms across\n"
+        "real-world coding tasks, providers, and hardware setups."
+    )
     usage = "Usage: scripts/cli.py [OPTIONS] COMMAND [ARGS]..."
     right = (
         "\n"
