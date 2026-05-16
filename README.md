@@ -1,13 +1,14 @@
 # AI agentic coding test
 The same coding prompts, fed into different AI models and their results.
 
-Benchmarks can be found in [benchmark-results.md](benchmark-results.md). Prompts and results are organized as follows:
-
 ### /prompts
 The prompts used
 
 ### /results
 The resulting code, organized by prompt, provider and model with the directory structure:
+
+### /benchmarks
+Code generation benchmarks for each prompt, provider and model combination.
 
 ```
 /<prompt>/<provider>/<model>/<run>
