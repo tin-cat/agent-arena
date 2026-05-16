@@ -1,7 +1,9 @@
 # AI agentic coding test
-The same coding prompts, fed into different AI models for agentic coding and their results, benchmarked for a realistic usage comparison.
+Understand how different LLM models and agentic coding platforms perform and behave in different scenarios, different coding tasks and different hardware.
 
-Each test simulates a real coding task, and results are divided into multiple stages from a first unattended run to the incremental implementation of complex refinements.
+This repository intends to provide you with a clearer view on real-world coding scenarios to help you decide which fits your coding needs better. For example, it will be really helpful if you're trying to decide whether a local inference setup or a cloud-based one is best for you.
+
+Each test simulates a real coding task, and results are divided into multiple stages from a first unattended run to the incremental implementation of complex refinements. Users [contribute](CONTRIBUTING.md) their test runs in different tech stack combinations.
 
 ## Tests structure
 
