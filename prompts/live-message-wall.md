@@ -5,9 +5,8 @@ Build a web application called "Wall" where visitors can leave a message that ge
 
 The wall displays the messages from newest to oldest, and updates lives as new messages are added.
 
-Users do not need to log in.
+Users do not need to log in. Users do not provide any identification information when adding a message, only the message itself.
 Messages cannot be removed.
-Users do not provide any identification information when adding a message, only the message itself.
 
 The website UI is extremely simplistic, resembling a typical text-mode console, it looks like it was a modern TUI like those in claude code and opencode, using a console-like, small font, a dark theme and a text-only, ASCII inspired interface.
 
@@ -20,7 +19,7 @@ Messages on the wall are displayed from top to bottom and left to right, just li
 Add a README.md file that documents the application and its technical structure.
 ```
 
-## Additional prompts
+## Advanced features
 
 ```
 Prevent users from flooding the wall, for example, by not allowing the same user to add a message if they already added one in the last hour.
@@ -29,4 +28,8 @@ Prevent users from flooding the wall, for example, by not allowing the same user
 ```
 Add a couple thousand random messages for testing.
 Make the wall lazy loading, so it only loads the first N messages at first, and loads more automatically as the user scrolls to the right.
+```
+
+```
+Messages in the wall disappear slowly over time, becoming gradually transparent until they completely disappear. The maximum age of all messages is 1 month. Once a message has completely disappeared, you can remove it from the database.
 ```
