@@ -44,4 +44,6 @@ When hovering a message, it becomes opaque so hovering old, almost invisible mes
 Links in messages are clickable in the modal.
 
 Add CSRF check to the message posting. Check messages for XSS and other hacks to prevent security bugs.
+
+Add a sticky header to the top of the horizontal scrolling list of messages that shows the approximate date of the messages at that vertical point of the list.
 ```
