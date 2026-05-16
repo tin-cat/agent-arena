@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const MAX_LEN = 4096;
 const PAGE_SIZE = 50;
-const TEN_MIN_MS = 10 * 60 * 1000;
+const TEN_MIN_MS = 1 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -408,6 +408,7 @@ function seedMessages() {
       id: crypto.randomUUID(),
       text: SEED_POOL[i % SEED_POOL.length],
       timestamp: new Date(now - age).toISOString(),
+      replies: [],
     });
   }
   messages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -450,7 +451,9 @@ app.get('/messages', (req, res) => {
   }
 
   res.json({
-    messages: messages.slice(startIdx, startIdx + limit),
+    messages: messages.slice(startIdx, startIdx + limit).map(m => ({
+      id: m.id, text: m.text, timestamp: m.timestamp, replyCount: m.replies.length,
+    })),
     hasMore: startIdx + limit < messages.length,
     total: messages.length,
   });
@@ -468,7 +471,9 @@ app.get('/events', (req, res) => {
   };
 
   clients.add(send);
-  send({ type: 'init', messages: messages.slice(0, PAGE_SIZE), total: messages.length });
+  send({ type: 'init', messages: messages.slice(0, PAGE_SIZE).map(m => ({
+    id: m.id, text: m.text, timestamp: m.timestamp, replyCount: m.replies.length,
+  })), total: messages.length });
 
   req.on('close', () => clients.delete(send));
 });
@@ -515,13 +520,71 @@ app.post('/messages', (req, res) => {
     id: crypto.randomUUID(),
     text,
     timestamp: new Date().toISOString(),
+    replies: [],
   };
 
   messages.unshift(msg);
 
-  for (const send of clients) send({ type: 'message', ...msg });
+  for (const send of clients) send({ type: 'message', id: msg.id, text: msg.text, timestamp: msg.timestamp, replyCount: 0 });
 
   res.status(201).json({ ok: true });
+});
+
+app.get('/messages/:id/replies', (req, res) => {
+  const msg = messages.find(m => m.id === req.params.id);
+  if (!msg) return res.status(404).json({ error: 'Message not found.' });
+  res.json({ replies: msg.replies });
+});
+
+app.post('/messages/:id/replies', (req, res) => {
+  const csrfHeader = req.headers['x-csrf-token'];
+  if (!req.csrfToken || req.csrfToken !== csrfHeader) {
+    return res.status(403).json({ error: 'Invalid CSRF token.' });
+  }
+
+  const msg = messages.find(m => m.id === req.params.id);
+  if (!msg) return res.status(404).json({ error: 'Message not found.' });
+
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || req.socket.remoteAddress
+    || 'unknown';
+  const now = Date.now();
+  const ipKey = `ip:${ip}`;
+  const userKey = req.userId ? `user:${req.userId}` : null;
+
+  const lastPost = Math.max(
+    rateLimits.get(ipKey) || 0,
+    userKey ? (rateLimits.get(userKey) || 0) : 0,
+  );
+
+  if (lastPost && now - lastPost < TEN_MIN_MS) {
+    const retryAfter = Math.ceil((TEN_MIN_MS - (now - lastPost)) / 1000);
+    return res.status(429).json({ error: 'Rate limited.', retryAfter });
+  }
+
+  const body = req.body ?? {};
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+
+  if (!text) return res.status(400).json({ error: 'Reply text is required.' });
+  if (text.length > MAX_LEN) return res.status(400).json({ error: `Max ${MAX_LEN} characters.` });
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text)) {
+    return res.status(400).json({ error: 'Invalid reply content.' });
+  }
+
+  rateLimits.set(ipKey, now);
+  if (userKey) rateLimits.set(userKey, now);
+
+  const reply = {
+    id: crypto.randomUUID(),
+    text,
+    timestamp: new Date().toISOString(),
+  };
+
+  msg.replies.unshift(reply);
+
+  for (const send of clients) send({ type: 'reply_count', id: msg.id, replyCount: msg.replies.length });
+
+  res.status(201).json({ ok: true, reply });
 });
 
 app.listen(PORT, () => console.log(`Wall running at http://localhost:${PORT}`));
