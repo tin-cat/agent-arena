@@ -20,5 +20,5 @@ Code generation benchmarks for each prompt, provider and model combination.
 - **run** One of the following:
     - `first-run` What came out after the first run.
     - `advanced-features` What came out after asking for advanced features, in an entirely new session.
-    - `manually-refined` What came out after further manual prompting for refinement and bug solving.
-    - `complex-manual-refinements` What came out after complex manual prompting for refinement and bug solving.
+    - `refinements` What came out after asking for refinements and bug solving if needed.
+    - `complex-refinements` What came out after asking for complex refinements and bug solving if needed.

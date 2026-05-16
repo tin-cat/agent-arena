@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WALL</title>
+  <style>
+    :root {
+      --bg:        #0c0c0c;
+      --surface:   #111111;
+      --border:    #222222;
+      --border-hi: #383838;
+      --text:      #c8c8c8;
+      --dim:       #4a4a4a;
+      --dimmer:    #2d2d2d;
+      --green:     #4ade80;
+      --green-dim: #1a4731;
+      --blue:      #38bdf8;
+      --card-w:    27ch;
+      --ruler-h:   18px;
+      --card-h:    10.5em;
+      --bar-h:     36px;
+      --status-h:  20px;
+      --font:      ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code",
+                   "Source Code Pro", "Courier New", monospace;
+      --fs:        12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: var(--fs);
+      line-height: 1.5;
+    }
+
+    /* ── Top bar ─────────────────────────────────────────── */
+
+    #topbar {
+      display: flex;
+      align-items: center;
+      min-height: var(--bar-h);
+      padding: 0 10px;
+      gap: 8px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+    }
+
+    #topbar.composing {
+      flex-wrap: wrap;
+      row-gap: 0;
+      align-items: center;
+      padding-bottom: 6px;
+    }
+
+    #compose-spacer { display: none; flex: 1; }
+    #topbar.composing #compose-spacer { display: block; }
+
+    #logo {
+      color: var(--green);
+      font-weight: bold;
+      letter-spacing: .15em;
+      white-space: nowrap;
+    }
+
+    .vsep {
+      color: var(--border-hi);
+      user-select: none;
+    }
+
+    #prompt {
+      color: var(--green);
+      user-select: none;
+    }
+
+    #msg-input {
+      flex: 1;
+      min-width: 0;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: var(--fs);
+      caret-color: var(--green);
+      line-height: 1.5;
+      /* Single-line appearance for textarea */
+      height: calc(var(--fs) * 1.5);
+      resize: none;
+      overflow: hidden;
+      padding: 0;
+      transition: height 200ms ease;
+    }
+
+    #msg-input::placeholder { color: var(--dim); }
+
+    /* Composing (expanded) state */
+    #topbar.composing #msg-input {
+      order: 10;
+      flex: 0 0 100%;
+      overflow-y: auto;
+      padding: 6px 0 2px;
+      border-top: 1px solid var(--border);
+      resize: vertical;
+      max-height: 75vh;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) transparent;
+    }
+
+    #topbar.composing #post-btn { order: 11; margin-left: auto; margin-top: 2px; }
+
+    #char-count {
+      color: var(--dim);
+      white-space: nowrap;
+      font-size: 10px;
+      min-width: 6ch;
+      text-align: right;
+    }
+
+    #char-count.warn { color: #f59e0b; }
+    #char-count.over { color: #f87171; }
+
+    #post-btn {
+      background: transparent;
+      border: 1px solid var(--border-hi);
+      color: var(--green);
+      font-family: var(--font);
+      font-size: var(--fs);
+      padding: 3px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 80ms, border-color 80ms, background 80ms;
+      user-select: none;
+    }
+
+    #post-btn:hover:not(:disabled) {
+      border-color: var(--green-dim);
+    }
+
+    #post-btn:active:not(:disabled) {
+      background: rgba(74, 222, 128, .06);
+    }
+
+    #post-btn:disabled {
+      cursor: default;
+      color: #9a9a9a;
+    }
+
+    /* ── Wall container ──────────────────────────────────── */
+
+    #wall-outer {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) var(--bg);
+    }
+
+    #wall-outer::-webkit-scrollbar       { height: 4px; }
+    #wall-outer::-webkit-scrollbar-track { background: var(--bg); }
+    #wall-outer::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+
+    #date-ruler {
+      flex-shrink: 0;
+      height: var(--ruler-h);
+      position: relative;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      align-self: stretch;
+    }
+
+    .date-tick {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+      padding-right: 10px;
+      font-size: 10px;
+      color: var(--dim);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .date-tick + .date-tick {
+      border-left: 1px solid var(--border);
+    }
+
+    #wall {
+      display: flex;
+      flex-direction: column;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      flex: 1;
+      min-height: 0;
+      align-self: flex-start;
+      gap: 7px;
+      padding: 8px 10px;
+      user-select: none;
+    }
+
+    /* ── Message card ────────────────────────────────────── */
+
+    .card {
+      width: var(--card-w);
+      height: var(--card-h);
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      overflow: hidden;
+      transition: border-color 100ms, opacity 400ms;
+      position: relative;
+    }
+
+    .card:hover {
+      border-color: var(--border-hi);
+      opacity: 1 !important;
+      transition: border-color 100ms, opacity 120ms;
+    }
+
+    .card:hover .card-body {
+      -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+              mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+    }
+
+    .card-head {
+      flex-shrink: 0;
+      padding: 4px 7px 3px;
+      border-bottom: 1px solid var(--border);
+      color: var(--dim);
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-body {
+      flex: 1;
+      padding: 5px 7px 4px;
+      overflow: hidden;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+              mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+    }
+
+    .card-more {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      font-size: 10px;
+      color: var(--dim);
+      pointer-events: none;
+    }
+
+    .card-new {
+      animation: card-in 250ms ease-out;
+    }
+
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(-3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Loading indicator ───────────────────────────────── */
+
+    #load-more {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--card-w);
+      height: 100%;
+      flex-shrink: 0;
+      color: var(--dim);
+      font-size: 10px;
+      padding: 0 10px;
+    }
+
+    /* ── Empty state ─────────────────────────────────────── */
+
+    #empty {
+      color: var(--dim);
+      padding: 12px 4px;
+      font-size: 11px;
+    }
+
+    /* ── Status bar ──────────────────────────────────────── */
+
+    #statusbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: var(--status-h);
+      padding: 0 10px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--dim);
+      flex-shrink: 0;
+    }
+
+    #status-conn { transition: color 200ms; }
+    #status-conn.live { color: var(--green); }
+    #status-conn.err  { color: #f87171; }
+
+    /* ── Modal ───────────────────────────────────────────── */
+
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .82);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #overlay.open { display: flex; }
+
+    #modal {
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      width: min(64ch, 90vw);
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #modal-ts {
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    #modal-close {
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-family: var(--font);
+      font-size: var(--fs);
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      outline: none;
+    }
+
+    #modal-close:hover { color: var(--text); }
+    #modal-close:focus-visible { color: var(--text); }
+
+    #modal-body {
+      padding: 10px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      line-height: 1.7;
+      flex: 1;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) transparent;
+    }
+
+    /* ── Modal links ─────────────────────────────────────── */
+
+    #modal-body a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    #modal-body a:hover { text-decoration: underline; }
+
+    /* ── Toast ───────────────────────────────────────────── */
+
+    #toast {
+      position: fixed;
+      bottom: calc(var(--status-h) + 12px);
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--surface);
+      border: 1px solid var(--border-hi);
+      color: var(--text);
+      padding: 7px 14px;
+      font-size: 11px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 180ms, transform 180ms;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Layout wiring ───────────────────────────────────── */
+
+    body { display: flex; flex-direction: column; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span id="logo">WALL</span>
+  <span class="vsep">│</span>
+  <span id="prompt">&gt;</span>
+  <textarea id="msg-input" maxlength="4096" rows="1"
+            placeholder="type a message…"
+            autocomplete="off" spellcheck="false" aria-label="Message"></textarea>
+  <span id="compose-spacer"></span>
+  <span id="char-count">4096</span>
+  <button id="post-btn">[ add to wall ]</button>
+</div>
+
+<!-- Wall -->
+<div id="wall-outer">
+  <div id="date-ruler"></div>
+  <div id="wall">
+    <span id="empty">no messages yet. be the first.</span>
+    <div id="load-more"></div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div id="statusbar">
+  <span id="status-conn">WALL ──</span>
+  <span id="status-count">0 messages</span>
+</div>
+
+<!-- Toast -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- Modal -->
+<div id="overlay" role="dialog" aria-modal="true" aria-labelledby="modal-ts">
+  <div id="modal">
+    <div id="modal-head">
+      <span id="modal-ts"></span>
+      <button id="modal-close" aria-label="Close">[x]</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+  const MAX_LEN = 4096;
+  const MIN_COMPOSE_H = 64;   // px — initial expanded height (~4 lines)
+  const maxComposeH = () => Math.floor(window.innerHeight * 0.75);
+  const TEN_MIN_MS = 10 * 60 * 1000;
+  const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+  const topbar     = document.getElementById('topbar');
+  const toast      = document.getElementById('toast');
+  const dateRuler  = document.getElementById('date-ruler');
+  const wallOuter  = document.getElementById('wall-outer');
+  const wall       = document.getElementById('wall');
+  const empty      = document.getElementById('empty');
+  const loadMore   = document.getElementById('load-more');
+  const input      = document.getElementById('msg-input');
+  const charCount  = document.getElementById('char-count');
+  const postBtn    = document.getElementById('post-btn');
+  const statusConn = document.getElementById('status-conn');
+  const statusCnt  = document.getElementById('status-count');
+  const overlay    = document.getElementById('overlay');
+  const modalTs    = document.getElementById('modal-ts');
+  const modalBody  = document.getElementById('modal-body');
+  const modalClose = document.getElementById('modal-close');
+
+  let toastTimer = null;
+  let rulerRebuildTimer = null;
+  let inputUserResized = false;
+  let inputJsHeight = 0;
+  let loadedCount = 0;
+  let totalCount = 0;
+  let oldestTimestamp = null;
+  let hasMore = false;
+  let isLoadingMore = false;
+  let cooldownTimer = null;
+
+  const seen = new Set();
+
+  // ── Helpers ────────────────────────────────────────────
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+  }
+
+  // Wrap http(s) URLs in <a> tags; all text is HTML-escaped
+  function linkify(text) {
+    const URL_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
+    const parts = [];
+    let last = 0;
+    let m;
+    while ((m = URL_RE.exec(text)) !== null) {
+      parts.push(esc(text.slice(last, m.index)));
+      const url = m[0];
+      parts.push(`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`);
+      last = URL_RE.lastIndex;
+    }
+    parts.push(esc(text.slice(last)));
+    return parts.join('');
+  }
+
+  function getCsrfToken() {
+    const m = document.cookie.match(/(?:^|; )wallCsrfToken=([^;]*)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  function showToast(msg, ms = 4000) {
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('visible'), ms);
+  }
+
+  function fmtDateApprox(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const msgUTC   = Date.UTC(d.getUTCFullYear(),   d.getUTCMonth(),   d.getUTCDate());
+    const diff = Math.round((todayUTC - msgUTC) / 86400000);
+    if (diff <= 0) return 'today';
+    if (diff === 1) return 'yesterday';
+    if (diff < 7) return `${diff}d ago`;
+    return d.toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', timeZone: 'UTC',
+      year: d.getUTCFullYear() !== now.getUTCFullYear() ? 'numeric' : undefined,
+    });
+  }
+
+  function rebuildDateRuler() {
+    const cards = Array.from(wall.querySelectorAll('.card[data-ts]'));
+    dateRuler.innerHTML = '';
+    if (!cards.length) { dateRuler.style.minWidth = ''; return; }
+
+    // Sync ruler width with wall content width so both scroll together
+    dateRuler.style.minWidth = wall.scrollWidth + 'px';
+
+    const gap = 7;
+    const padLeft = 10;
+    const cardW = cards[0].offsetWidth;
+    const cardH = cards[0].offsetHeight;
+    const colW = cardW + gap;
+    const wallInnerH = wall.offsetHeight - 16; // subtract 8px top + 8px bottom padding
+    const cardsPerCol = Math.max(1, Math.floor((wallInnerH + gap) / (cardH + gap)));
+
+    let prevLabel = null;
+    for (let col = 0; ; col++) {
+      const idx = col * cardsPerCol;
+      if (idx >= cards.length) break;
+      const label = fmtDateApprox(cards[idx].dataset.ts);
+      if (label === prevLabel) continue;
+      prevLabel = label;
+      const tick = document.createElement('span');
+      tick.className = 'date-tick';
+      tick.textContent = label;
+      tick.style.left = (padLeft + col * colW) + 'px';
+      dateRuler.appendChild(tick);
+    }
+  }
+
+  function scheduleRulerRebuild() {
+    if (rulerRebuildTimer) return;
+    rulerRebuildTimer = setTimeout(() => { rulerRebuildTimer = null; rebuildDateRuler(); }, 150);
+  }
+
+  window.addEventListener('resize', scheduleRulerRebuild);
+
+  function fmtTs(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} `
+         + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  }
+
+  function getOpacity(ts) {
+    const age = Date.now() - new Date(ts).getTime();
+    return Math.max(0, 1 - age / ONE_MONTH_MS);
+  }
+
+  // ── Wall rendering ─────────────────────────────────────
+
+  function removeEmpty() {
+    if (empty.parentNode === wall) wall.removeChild(empty);
+  }
+
+  function makeCard(msg) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.dataset.ts = msg.timestamp;
+    div.style.opacity = getOpacity(msg.timestamp);
+    div.innerHTML =
+      `<div class="card-head">${fmtTs(msg.timestamp)}</div>` +
+      `<div class="card-body">${esc(msg.text)}</div>` +
+      `<span class="card-more">···</span>`;
+    div.addEventListener('click', () => openModal(msg));
+    return div;
+  }
+
+  function prependCard(msg) {
+    if (seen.has(msg.id)) return;
+    seen.add(msg.id);
+    removeEmpty();
+    const card = makeCard(msg);
+    card.classList.add('card-new');
+    wall.insertBefore(card, wall.firstChild);
+    loadedCount++;
+    totalCount++;
+    updateCount();
+    scheduleRulerRebuild();
+  }
+
+  function appendCard(msg) {
+    if (seen.has(msg.id)) return;
+    seen.add(msg.id);
+    removeEmpty();
+    wall.insertBefore(makeCard(msg), loadMore);
+    loadedCount++;
+    if (msg.timestamp < (oldestTimestamp ?? '')) oldestTimestamp = msg.timestamp;
+    else if (!oldestTimestamp) oldestTimestamp = msg.timestamp;
+    updateCount();
+    scheduleRulerRebuild();
+  }
+
+  function updateCount() {
+    const allLoaded = !hasMore;
+    statusCnt.textContent = allLoaded
+      ? `${loadedCount} message${loadedCount === 1 ? '' : 's'}`
+      : `${loadedCount} of ${totalCount} messages`;
+  }
+
+  // ── Opacity fading ─────────────────────────────────────
+
+  function updateOpacities() {
+    let removed = false;
+    const cards = wall.querySelectorAll('.card[data-ts]');
+    cards.forEach(card => {
+      const opacity = getOpacity(card.dataset.ts);
+      if (opacity <= 0) {
+        card.remove();
+        loadedCount = Math.max(0, loadedCount - 1);
+        totalCount = Math.max(0, totalCount - 1);
+        removed = true;
+        updateCount();
+      } else {
+        card.style.opacity = opacity;
+      }
+    });
+    if (removed) scheduleRulerRebuild();
+  }
+
+  setInterval(updateOpacities, 5 * 60 * 1000);
+
+  // ── Lazy loading ───────────────────────────────────────
+
+  async function fetchMore() {
+    if (isLoadingMore || !hasMore) return;
+    isLoadingMore = true;
+    loadMore.textContent = 'loading…';
+
+    try {
+      const url = oldestTimestamp
+        ? `/messages?before=${encodeURIComponent(oldestTimestamp)}&limit=50`
+        : '/messages?limit=50';
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const data = await r.json();
+      data.messages.forEach(appendCard);
+      hasMore = data.hasMore;
+      totalCount = data.total;
+      updateCount();
+    } catch (_) {
+    } finally {
+      isLoadingMore = false;
+      loadMore.textContent = hasMore ? '' : '';
+    }
+  }
+
+  wallOuter.addEventListener('scroll', () => {
+    const { scrollLeft, scrollWidth, clientWidth } = wallOuter;
+    if (scrollLeft + clientWidth >= scrollWidth - 600) {
+      fetchMore();
+    }
+  });
+
+  // ── Modal ──────────────────────────────────────────────
+
+  function openModal(msg) {
+    modalTs.textContent = fmtTs(msg.timestamp);
+    modalBody.innerHTML = linkify(msg.text);
+    overlay.classList.add('open');
+    modalClose.focus();
+  }
+
+  function closeModal() {
+    overlay.classList.remove('open');
+  }
+
+  modalClose.addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // ── Cooldown ───────────────────────────────────────────
+
+  function startCooldown(retryAfterSeconds) {
+    const until = Date.now() + retryAfterSeconds * 1000;
+    localStorage.setItem('wallCooldownUntil', String(until));
+    runCooldown(until);
+  }
+
+  function runCooldown(until) {
+    if (cooldownTimer) clearInterval(cooldownTimer);
+    postBtn.disabled = true;
+
+    const tick = () => {
+      const remaining = Math.ceil((until - Date.now()) / 1000);
+      if (remaining <= 0) {
+        clearInterval(cooldownTimer);
+        cooldownTimer = null;
+        postBtn.disabled = false;
+        postBtn.textContent = '[ add to wall ]';
+        localStorage.removeItem('wallCooldownUntil');
+        return;
+      }
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      postBtn.textContent = m > 0 ? `[ wait ${m}m ${s}s ]` : `[ wait ${s}s ]`;
+    };
+
+    tick();
+    cooldownTimer = setInterval(tick, 1000);
+  }
+
+  // Restore cooldown after page reload
+  const storedCooldown = localStorage.getItem('wallCooldownUntil');
+  if (storedCooldown) {
+    const until = parseInt(storedCooldown, 10);
+    if (until > Date.now()) runCooldown(until);
+  }
+
+  // ── Compose expand / collapse ──────────────────────────
+
+  function expandInput() {
+    if (topbar.classList.contains('composing')) return;
+    inputUserResized = false;
+    inputJsHeight = MIN_COMPOSE_H;
+    topbar.classList.add('composing');
+    input.style.height = MIN_COMPOSE_H + 'px'; // triggers CSS transition
+  }
+
+  function resizeInput() {
+    if (!topbar.classList.contains('composing')) return;
+    if (inputUserResized) return; // user manually dragged, don't override
+    // Temporarily suppress transition so measurement height flash is invisible
+    input.style.transition = 'none';
+    input.style.height = '0';
+    const h = Math.max(MIN_COMPOSE_H, Math.min(input.scrollHeight, maxComposeH()));
+    input.style.height = h + 'px';
+    inputJsHeight = h;
+    requestAnimationFrame(() => { input.style.transition = ''; });
+  }
+
+  function collapseInput() {
+    if (input.value.trim()) return; // keep expanded if there's a draft
+    topbar.classList.remove('composing');
+    input.style.transition = 'none';
+    input.style.height = '';
+    requestAnimationFrame(() => { input.style.transition = ''; });
+  }
+
+  input.addEventListener('focus', expandInput);
+  input.addEventListener('blur', collapseInput);
+
+  // ── Input ──────────────────────────────────────────────
+
+  input.addEventListener('input', () => {
+    const remaining = MAX_LEN - input.value.length;
+    charCount.textContent = remaining;
+    charCount.className = remaining < 0 ? 'over' : remaining < 200 ? 'warn' : '';
+    resizeInput();
+    if (input.value) localStorage.setItem('wallDraft', input.value);
+    else localStorage.removeItem('wallDraft');
+  });
+
+  async function post() {
+    const text = input.value.trim();
+    if (!text || text.length > MAX_LEN) return;
+
+    // Inform user of remaining cooldown instead of silently ignoring Enter
+    if (postBtn.disabled) {
+      const stored = localStorage.getItem('wallCooldownUntil');
+      if (stored) {
+        const remaining = Math.ceil((parseInt(stored, 10) - Date.now()) / 1000);
+        if (remaining > 0) {
+          const m = Math.floor(remaining / 60), s = remaining % 60;
+          showToast(m > 0 ? `Rate limited — try again in ${m}m ${s}s` : `Rate limited — try again in ${s}s`);
+        }
+      }
+      return;
+    }
+
+    postBtn.disabled = true;
+    postBtn.textContent = '[ posting… ]';
+
+    try {
+      const r = await fetch('/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfToken(),
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (r.ok) {
+        input.value = '';
+        charCount.textContent = MAX_LEN;
+        charCount.className = '';
+        collapseInput();
+        localStorage.removeItem('wallDraft');
+        localStorage.setItem('wallCooldownUntil', String(Date.now() + TEN_MIN_MS));
+        startCooldown(10 * 60);
+      } else {
+        const data = await r.json().catch(() => ({}));
+        if (r.status === 429 && data.retryAfter) {
+          const ra = data.retryAfter;
+          startCooldown(ra);
+          const m = Math.floor(ra / 60), s = ra % 60;
+          showToast(m > 0 ? `Rate limited — try again in ${m}m ${s}s` : `Rate limited — try again in ${s}s`);
+        } else {
+          postBtn.disabled = false;
+          postBtn.textContent = '[ add to wall ]';
+          showToast(data.error || 'Could not post message.');
+        }
+      }
+    } catch {
+      postBtn.disabled = false;
+      postBtn.textContent = '[ add to wall ]';
+      showToast('Network error. Please try again.');
+    } finally {
+      input.focus();
+    }
+  }
+
+  postBtn.addEventListener('click', post);
+
+  new ResizeObserver(() => {
+    if (!topbar.classList.contains('composing')) return;
+    if (Math.abs(input.offsetHeight - inputJsHeight) > 4) inputUserResized = true;
+    scheduleRulerRebuild();
+  }).observe(input);
+
+  new ResizeObserver(scheduleRulerRebuild).observe(wall);
+
+  // ── SSE ────────────────────────────────────────────────
+
+  function connect() {
+    const es = new EventSource('/events');
+
+    es.onopen = () => {
+      statusConn.textContent = 'WALL ── live';
+      statusConn.className = 'live';
+    };
+
+    es.onmessage = e => {
+      const payload = JSON.parse(e.data);
+
+      if (payload.type === 'init') {
+        totalCount = payload.total;
+        payload.messages.forEach(appendCard);
+        hasMore = loadedCount < totalCount;
+        updateCount();
+      } else if (payload.type === 'message') {
+        prependCard(payload);
+      }
+    };
+
+    es.onerror = () => {
+      statusConn.textContent = 'WALL ── reconnecting…';
+      statusConn.className = 'err';
+      es.close();
+      setTimeout(connect, 3000);
+    };
+  }
+
+  // Restore any in-progress draft from a previous session
+  const storedDraft = localStorage.getItem('wallDraft');
+  if (storedDraft) {
+    input.value = storedDraft;
+    const remaining = MAX_LEN - storedDraft.length;
+    charCount.textContent = remaining;
+    charCount.className = remaining < 0 ? 'over' : remaining < 200 ? 'warn' : '';
+    expandInput();
+    resizeInput();
+  }
+
+  connect();
+</script>
+</body>
+</html>
