@@ -30,7 +30,7 @@ Prevent users from flooding the wall, for example, by not allowing the same user
 Messages in the wall disappear slowly over time, becoming gradually transparent until they completely disappear. The maximum age of all messages is 1 month. Once a message has completely disappeared, you can remove it from the database.
 ```
 
-## Manual refinements
+## Refinements
 
 ```
 Use cookies + IP instead of only IP for rate limiting.
@@ -56,8 +56,8 @@ When clicking the top input to start writing a message, or when typing on it, th
 Store the message currently being written in the browser storage so it's not lost if the user accidentally reloads the page, or if it closes the page and comes back sometime after.
 ```
 
-## Complex manual refinements
+## Complex refinements
 
 ```
-Add the ability to reply to messages with another message. Replies do not appear on the wall. Messages with replies have a button that states "N replies". When clicking the button, a modal appears with a vertical list of all replies, ordered from most recent to oldest. Replies cannot be replied.
+Add the ability to reply to messages with another message. Replies do not appear on the wall. Messages with replies have a button that states "N replies". When opening a message modal, it shows the message and also all its replies below, from most recent to oldest. If the content of the model does not fit on the screen, the user can scroll it vertically. Below the message, and above the first reply (if any), a textarea allows to add a reply from there. The same limits and controls present in adding a new message must apply to replying. Refactor when needed if it's best to keep an easy to understand codebase and database structure.
 ```
