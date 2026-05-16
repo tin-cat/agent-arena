@@ -4,7 +4,7 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MAX_LEN = 500;
+const MAX_LEN = 4096;
 const PAGE_SIZE = 50;
 const TEN_MIN_MS = 10 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;

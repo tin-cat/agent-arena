@@ -43,13 +43,24 @@
     #topbar {
       display: flex;
       align-items: center;
-      height: var(--bar-h);
+      min-height: var(--bar-h);
       padding: 0 10px;
       gap: 8px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      flex-wrap: nowrap;
     }
+
+    #topbar.composing {
+      flex-wrap: wrap;
+      row-gap: 0;
+      align-items: center;
+      padding-bottom: 6px;
+    }
+
+    #compose-spacer { display: none; flex: 1; }
+    #topbar.composing #compose-spacer { display: block; }
 
     #logo {
       color: var(--green);
@@ -78,9 +89,27 @@
       font-family: var(--font);
       font-size: var(--fs);
       caret-color: var(--green);
+      line-height: 1.5;
+      /* Single-line appearance for textarea */
+      height: calc(var(--fs) * 1.5);
+      resize: none;
+      overflow: hidden;
+      padding: 0;
+      transition: height 200ms ease;
     }
 
     #msg-input::placeholder { color: var(--dim); }
+
+    /* Composing (expanded) state */
+    #topbar.composing #msg-input {
+      order: 10;
+      flex: 0 0 100%;
+      overflow-y: auto;
+      padding: 6px 0 2px;
+      border-top: 1px solid var(--border);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-hi) transparent;
+    }
 
     #char-count {
       color: var(--dim);
@@ -387,9 +416,11 @@
   <span id="logo">WALL</span>
   <span class="vsep">│</span>
   <span id="prompt">&gt;</span>
-  <input id="msg-input" type="text" maxlength="500" placeholder="type a message and press Enter…"
-         autocomplete="off" spellcheck="false" aria-label="Message">
-  <span id="char-count">500</span>
+  <textarea id="msg-input" maxlength="4096" rows="1"
+            placeholder="type a message and press Enter…"
+            autocomplete="off" spellcheck="false" aria-label="Message"></textarea>
+  <span id="compose-spacer"></span>
+  <span id="char-count">4096</span>
   <button id="post-btn">[ add to wall ]</button>
 </div>
 
@@ -423,10 +454,13 @@
 </div>
 
 <script>
-  const MAX_LEN = 500;
+  const MAX_LEN = 4096;
+  const MIN_COMPOSE_H = 64;   // px — initial expanded height (~4 lines)
+  const MAX_COMPOSE_H = 200;  // px — cap before internal scroll kicks in
   const TEN_MIN_MS = 10 * 60 * 1000;
   const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
+  const topbar     = document.getElementById('topbar');
   const toast      = document.getElementById('toast');
   const dateRuler  = document.getElementById('date-ruler');
   const wallOuter  = document.getElementById('wall-outer');
@@ -492,15 +526,15 @@
   function fmtDateApprox(iso) {
     const d = new Date(iso);
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const diff = Math.round((today - msgDay) / 86400000);
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const msgUTC   = Date.UTC(d.getUTCFullYear(),   d.getUTCMonth(),   d.getUTCDate());
+    const diff = Math.round((todayUTC - msgUTC) / 86400000);
     if (diff <= 0) return 'today';
     if (diff === 1) return 'yesterday';
     if (diff < 7) return `${diff}d ago`;
     return d.toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric',
-      year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+      month: 'short', day: 'numeric', timeZone: 'UTC',
+      year: d.getUTCFullYear() !== now.getUTCFullYear() ? 'numeric' : undefined,
     });
   }
 
@@ -545,8 +579,8 @@
   function fmtTs(iso) {
     const d = new Date(iso);
     const pad = n => String(n).padStart(2,'0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} `
-         + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} `
+         + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
   }
 
   function getOpacity(ts) {
@@ -715,12 +749,42 @@
     if (until > Date.now()) runCooldown(until);
   }
 
+  // ── Compose expand / collapse ──────────────────────────
+
+  function expandInput() {
+    if (topbar.classList.contains('composing')) return;
+    topbar.classList.add('composing');
+    input.style.height = MIN_COMPOSE_H + 'px'; // triggers CSS transition
+  }
+
+  function resizeInput() {
+    if (!topbar.classList.contains('composing')) return;
+    // Temporarily suppress transition so measurement height flash is invisible
+    input.style.transition = 'none';
+    input.style.height = '0';
+    const h = Math.max(MIN_COMPOSE_H, Math.min(input.scrollHeight, MAX_COMPOSE_H));
+    input.style.height = h + 'px';
+    requestAnimationFrame(() => { input.style.transition = ''; });
+  }
+
+  function collapseInput() {
+    if (input.value.trim()) return; // keep expanded if there's a draft
+    topbar.classList.remove('composing');
+    input.style.transition = 'none';
+    input.style.height = '';
+    requestAnimationFrame(() => { input.style.transition = ''; });
+  }
+
+  input.addEventListener('focus', expandInput);
+  input.addEventListener('blur', collapseInput);
+
   // ── Input ──────────────────────────────────────────────
 
   input.addEventListener('input', () => {
     const remaining = MAX_LEN - input.value.length;
     charCount.textContent = remaining;
-    charCount.className = remaining < 20 ? 'over' : remaining < 60 ? 'warn' : '';
+    charCount.className = remaining < 0 ? 'over' : remaining < 200 ? 'warn' : '';
+    resizeInput();
   });
 
   async function post() {
@@ -757,6 +821,7 @@
         input.value = '';
         charCount.textContent = MAX_LEN;
         charCount.className = '';
+        collapseInput();
         localStorage.setItem('wallCooldownUntil', String(Date.now() + TEN_MIN_MS));
         startCooldown(10 * 60);
       } else {
