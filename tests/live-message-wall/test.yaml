@@ -1,0 +1,110 @@
+name: live-message-wall
+title: A live message wall
+description: |
+  A real-time, anonymous message wall web app with a TUI-inspired aesthetic.
+  Visitors can post messages without logging in, and the wall updates live as
+  new messages arrive. Later stages add lazy loading, rate limiting, fading
+  by age, security hardening, and threaded replies.
+domain: full-stack-web
+
+stages:
+  - id: stage-1-first-run
+    theme: bootstrap
+    prompt: |
+      Build a web application called "Wall" where visitors can leave a message that gets instantly published on the wall for others to see.
+
+      The wall displays the messages from newest to oldest, and updates lives as new messages are added.
+
+      Users do not need to log in. Users do not provide any identification information when adding a message, only the message itself.
+      Messages cannot be removed.
+
+      The website UI is extremely simplistic, resembling a typical text-mode console, it looks like it was a modern TUI like those in claude code and opencode, using a console-like, small font, a dark theme and a text-only, ASCII inspired interface.
+
+      There is a top, slim, sticky bar that contains the input for the user to enter its message and the "Add to wall" button. The rest of the screen is devoted to display the wall itself.
+
+      Messages on the wall have a fixed size, and the text is cropped if it does not fit into the message card. When clicked, a model opens to let the user read the entire message.
+
+      Messages on the wall are displayed from top to bottom and left to right, just like the text flow of newspapers, filling the entire available screen, and scrolling horizontally when there are more messages than the screen can fit.
+
+      Add a README.md file that documents the application and its technical structure.
+    evaluation:
+      - Anonymous posting (no login required)
+      - Messages cannot be removed once posted
+      - Wall updates live as new messages arrive
+      - TUI-style UI (dark theme, console font, ASCII feel)
+      - Top sticky bar with input and "Add to wall" button
+      - Fixed-size message cards with text cropped on overflow
+      - Click on a message opens a modal with the full text
+      - Newspaper-style layout (top-to-bottom, left-to-right, horizontal scroll)
+      - README.md documenting the app and its technical structure
+
+  - id: stage-2-advanced-features
+    builds_on: stage-1-first-run
+    theme: features
+    prompt: |
+      Add a couple thousand random messages for testing.
+      Make the wall lazy loading, so it only loads the first N messages at first, and loads more automatically as the user scrolls to the right.
+
+      Prevent users from flooding the wall, for example, by not allowing the same user to add a message if they already added one in the last hour.
+
+      Messages in the wall disappear slowly over time, becoming gradually transparent until they completely disappear. The maximum age of all messages is 1 month. Once a message has completely disappeared, you can remove it from the database.
+    evaluation:
+      - Around two thousand seeded random messages
+      - Lazy loading of more messages as the user scrolls right
+      - Rate limit (1 message per hour per user, IP-based)
+      - Messages fade gradually based on age, fully invisible at 1 month
+      - Fully faded messages are removed from the database
+
+  - id: stage-3-refinements
+    builds_on: stage-2-advanced-features
+    theme: refinements
+    prompt: |
+      Use cookies + IP instead of only IP for rate limiting.
+
+      Change the rate limit to 1 message every 10 minutes.
+
+      Show a toast when the user tries to add a message but is rate limited, letting them know about the amount of remaining time until they can post a message again.
+
+      When hovering a message, it becomes opaque so hovering old, almost invisible messages allows the user to see them before clicking to reveal the full message.
+
+      Links in messages are clickable in the modal.
+
+      Add CSRF check to the message posting. Check messages for XSS and other hacks to prevent security bugs.
+
+      Add a sticky header to the top of the horizontal scrolling list of messages that shows the approximate date of the messages at that vertical point of the list.
+
+      All dates are stored and displayed in UTC.
+
+      Allow emojis in messages.
+
+      When clicking the top input to start writing a message, or when typing on it, the input becomes a big textarea to allow and entice the user to write long messages. Messages can be up to 4KB, ensure the limit is not surpassed.
+
+      Store the message currently being written in the browser storage so it's not lost if the user accidentally reloads the page, or if it closes the page and comes back sometime after.
+    evaluation:
+      - Rate limiting uses cookies + IP
+      - Rate limit changed to 1 message every 10 minutes
+      - Rate-limit toast shows remaining cooldown time
+      - Hovering a faded message makes it opaque
+      - Links in messages are clickable in the modal
+      - CSRF protection on message posting
+      - XSS / injection sanitation on message content
+      - Sticky date header on the horizontal scroll list
+      - Dates stored and displayed in UTC
+      - Emoji support in messages
+      - Input expands to a textarea on focus/typing
+      - Message size limit enforced at 4KB
+      - In-progress draft persisted in browser storage
+
+  - id: stage-4-complex-refinements
+    builds_on: stage-3-refinements
+    theme: extension
+    prompt: |
+      Add the ability to reply to messages with another message. Replies do not appear on the wall. Messages with replies have a button that states "N replies". When opening a message modal, it shows the message and also all its replies below, from most recent to oldest. If the content of the model does not fit on the screen, the user can scroll it vertically. Below the message, and above the first reply (if any), a textarea allows to add a reply from there. The same limits and controls present in adding a new message must apply to replying. Refactor when needed if it's best to keep an easy to understand codebase and database structure.
+    evaluation:
+      - Reply to messages with another message
+      - Replies do not appear on the wall
+      - Message card shows "N replies" button when replies exist
+      - Modal shows the message plus replies, newest to oldest, below
+      - Modal scrolls vertically when content overflows
+      - Reply textarea sits between the message and the first reply
+      - Reply posting reuses the same limits/controls as posting a message

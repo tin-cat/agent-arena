@@ -1,0 +1,34 @@
+contributor: tin-cat
+agent:
+  name: claude-code
+  plan: pro
+provider: anthropic
+model: sonnet-4.6
+settings:
+  effort: high
+
+stages:
+  - id: stage-1-first-run
+    duration_sec: 447
+    tokens_out: 26300
+    cost_usd: 0.63
+    rating: excellent
+
+  - id: stage-2-advanced-features
+    duration_sec: 482
+    tokens_out: 26700
+    cost_usd: 0.70
+    rating: excellent
+
+  - id: stage-3-refinements
+    duration_sec: 2285
+    tokens_out: 147900
+    cost_usd: 6.58
+    rating: good
+    notes: Some additional prompting to fix minor UI bugs was needed.
+
+  - id: stage-4-complex-refinements
+    duration_sec: 688
+    tokens_out: 40100
+    cost_usd: 1.44
+    rating: excellent
