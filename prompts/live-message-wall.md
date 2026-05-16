@@ -33,7 +33,7 @@ Messages in the wall disappear slowly over time, becoming gradually transparent 
 ## Manual refinements
 
 ```
-Do not use IP to rate limit.
+Use cookies + IP instead of only IP for rate limiting.
 
 Change the rate limit to 1 message every 10 minutes.
 
