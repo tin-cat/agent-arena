@@ -1053,7 +1053,7 @@ def render(out_dir: Path, github_url: str) -> None:
     tmpl = env.from_string(TEMPLATE)
     html_out = tmpl.render(
         project_name="AgentArena",
-        tagline="A community benchmark for coding agent performance",
+        tagline="A community benchmark for AI coding agent performance",
         github_url=github_url,
         build_date=date.today().isoformat(),
         summary=summary,

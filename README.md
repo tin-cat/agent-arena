@@ -1,5 +1,5 @@
 # AgentArena
-**A community benchmark for coding agent performance**
+**A community benchmark for AI coding agent performance**
 
 This repository gives you a clearer picture of how different tools perform on real coding tasks. Useful if you're deciding, for example, whether a self-hosted inference setup or a cloud-based one is the better fit for your workflow.
 

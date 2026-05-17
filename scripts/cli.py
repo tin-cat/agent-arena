@@ -1888,7 +1888,7 @@ def validate_cmd(
 def _print_banner() -> None:
     title = "AgentArena"
     tagline = (
-        "A community benchmark for coding agent performance"
+        "A community benchmark for AI coding agent performance"
     )
     subtagline = "Contribute your tests and runs"
     right = (
