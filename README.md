@@ -3,9 +3,9 @@
 # AgentArena
 **A community benchmark for AI coding agent performance**
 
-This repository gives you a clearer picture of how different tools perform on real coding tasks. Useful if you're deciding, for example, whether a self-hosted inference setup or a cloud-based one is the better fit for your workflow.
+Choosing the right AI coding agent setup has too many moving parts to evaluate alone. Between the agent, model, provider, configurations, and hardware, there are too many variables—and vendor benchmarks rarely reflect real-world workloads. This repository collects community-contributed runs of the same real coding tasks across the combinations that matter, so you can compare them head-to-head.
 
-Each test simulates a real coding task, with results divided into multiple stages that progress from a first unattended run to the incremental implementation of complex refinements. Users [contribute](CONTRIBUTING.md) their runs across different combinations of models, providers, and settings, and also new tests.
+Each test unfolds in stages — an unattended first build, then progressively harder refinements — so results reflect not just whether a setup ships something, but whether it holds up under realistic follow-up work. [Contributors](CONTRIBUTING.md) add their own runs and new tests, and coverage grows with what the community cares about: cloud vs. self-hosted, frontier vs. open-weight, high-effort vs. fast, all rated against the same prompts on the same scale.
 
 ---
 
@@ -54,21 +54,6 @@ scripts/cli.py validate                        # check all yaml files against th
 ```
 
 Run `scripts/cli.py --help` for the full command list. On Windows, invoke with `python scripts/cli.py …` since the shebang isn't honored.
-
----
-
-## Stats site
-
-A static stats page is rebuilt and republished on every push to `main` — leaderboard by agent/provider/model, cost-vs-quality scatter, success rates by stage theme, per-test breakdown, and contributor activity. The build is driven by `scripts/build_site.py`, deployed via [`.github/workflows/build-site.yml`](.github/workflows/build-site.yml) to GitHub Pages.
-
-To preview it locally:
-
-```sh
-scripts/build_site.py            # writes site/index.html and site/stats.json
-open site/index.html             # or just open the file in your browser
-```
-
-The `site/` directory is gitignored — only the source data and the build script are committed.
 
 ---
 
