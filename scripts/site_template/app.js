@@ -281,7 +281,7 @@ function heroHTML() {
         <div class="hero-main">
           <div class="hero-eyebrow">▌ welcome</div>
           <h1 class="hero-title">${esc(tagline)}.</h1>
-          <p class="hero-lead">Picking an AI coding agent setup is a mess of variables: agent · model · provider · settings · hardware, and vendor benchmarks rarely reflect real workloads. We collect community-contributed runs of the same coding tasks to compare real-world performance and rank the best.</p>
+          <p class="hero-lead">Live rankings for every model, agent, rig, and contributor in the arena so far. Browse the board, drill into runs, peek at the silicon — then add your own to claim a slot.</p>
           <div class="hero-ctas">
             <a class="cta cta-primary" href="#/leaderboard">→ see the leaderboard</a>
             <a class="cta" href="${esc(DATA.github_url)}/blob/main/CONTRIBUTING.md" rel="noopener">+ contribute your tests</a>
