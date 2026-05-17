@@ -216,11 +216,20 @@ class TestStage(BaseModel):
 
 
 class Test(BaseModel):
+    contributor_url: str
     name: str
     title: str
     description: str
     domain: Optional[DomainT] = None
     stages: list[TestStage]
+
+    @field_validator("contributor_url")
+    @classmethod
+    def _check_contributor_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("must be a URL starting with http:// or https://")
+        return v
 
 
 # --------------------------------------------------------------------------- #
@@ -489,6 +498,9 @@ def build_per_test(loaded: dict[str, LoadedTest]) -> list[dict]:
             "title": lt.test.title,
             "description": lt.test.description.strip(),
             "domain": lt.test.domain,
+            "contributor_url":    lt.test.contributor_url,
+            "contributor_handle": handle_from_url(lt.test.contributor_url),
+            "contributor_avatar": avatar_from_url(lt.test.contributor_url),
             "stages_total": len(lt.test.stages),
             "test_stages": [
                 {"id": s.id, "theme": s.theme, "prompt": s.prompt, "builds_on": s.builds_on}
@@ -517,6 +529,24 @@ def build_activity(loaded: dict[str, LoadedTest]) -> list[dict]:
         for lr in lt.runs:
             by_date[lr.run.date.isoformat()] += 1
     return [{"date": d, "count": c} for d, c in sorted(by_date.items())]
+
+
+def _stage_perf(stages: list[RunStage]) -> dict:
+    """Shared aggregator: avg rating / duration / tokens-per-sec for a stage list."""
+    if not stages:
+        return {"avg_rating_score": None, "avg_duration_sec": None, "avg_tokens_per_sec": None}
+    score = rating_score(stages)
+    avg_dur = sum(s.duration_sec for s in stages) / len(stages)
+    tok_stages = [s for s in stages if s.tokens_out and s.duration_sec > 0]
+    avg_tps = (
+        sum(s.tokens_out / s.duration_sec for s in tok_stages) / len(tok_stages)
+        if tok_stages else None
+    )
+    return {
+        "avg_rating_score":   score,
+        "avg_duration_sec":   avg_dur,
+        "avg_tokens_per_sec": avg_tps,
+    }
 
 
 def build_hardware(loaded: dict[str, LoadedTest]) -> dict:
@@ -551,22 +581,6 @@ def build_hardware(loaded: dict[str, LoadedTest]) -> dict:
         cell["ram_gb"]  = max(cell["ram_gb"],  hw.ram_gb  or 0)
     total_vram = sum(d["vram_gb"] for d in unique_devices.values())
     total_ram  = sum(d["ram_gb"]  for d in unique_devices.values())
-
-    def _stage_perf(stages: list[RunStage]) -> dict:
-        if not stages:
-            return {"avg_rating_score": None, "avg_duration_sec": None, "avg_tokens_per_sec": None}
-        score = rating_score(stages)
-        avg_dur = sum(s.duration_sec for s in stages) / len(stages)
-        tok_stages = [s for s in stages if s.tokens_out and s.duration_sec > 0]
-        avg_tps = (
-            sum(s.tokens_out / s.duration_sec for s in tok_stages) / len(tok_stages)
-            if tok_stages else None
-        )
-        return {
-            "avg_rating_score":   score,
-            "avg_duration_sec":   avg_dur,
-            "avg_tokens_per_sec": avg_tps,
-        }
 
     # ── Hardware combos (device + gpu + framework + model + quantization) ──
     combos: dict[tuple[str, ...], list[tuple[LoadedTest, LoadedRun, Hardware]]] = defaultdict(list)
@@ -716,6 +730,69 @@ def build_contributors(loaded: dict[str, LoadedTest]) -> dict[str, list[dict]]:
             combos[f"{lr.run.provider} / {lr.run.model}"] += 1
         top_combo = max(combos.items(), key=lambda x: x[1])[0] if combos else None
 
+        # Favourite rig — most-used (device, gpu) among their self-hosted runs.
+        rigs: dict[tuple[str, str], dict] = defaultdict(lambda: {"count": 0, "vram_gb": 0, "ram_gb": 0})
+        for _, lr in items:
+            if lr.run.provider != "self-hosted" or not lr.run.hardware:
+                continue
+            hw = lr.run.hardware
+            key = (hw.device or "", hw.gpu or "")
+            cell = rigs[key]
+            cell["count"]   += 1
+            cell["vram_gb"]  = max(cell["vram_gb"], hw.vram_gb or 0)
+            cell["ram_gb"]   = max(cell["ram_gb"],  hw.ram_gb  or 0)
+        if rigs:
+            (dev, gpu), meta = max(rigs.items(), key=lambda kv: kv[1]["count"])
+            parts = [p for p in (dev, gpu) if p]
+            rig_str = " · ".join(parts) if parts else None
+            specs = []
+            if meta["vram_gb"]: specs.append(f"{meta['vram_gb']} gb vram")
+            if meta["ram_gb"]:  specs.append(f"{meta['ram_gb']} gb ram")
+            if specs and rig_str: rig_str = f"{rig_str} ({', '.join(specs)})"
+            top_rig = rig_str
+        else:
+            top_rig = None
+
+        # Per-rig (device + gpu) performance for the contributor's hardware panel.
+        rigs_agg: dict[tuple[str, str], dict] = defaultdict(lambda: {
+            "stages": [], "models": set(), "frameworks": set(),
+            "vram_gb": 0, "ram_gb": 0, "run_count": 0,
+        })
+        for _lt, lr in items:
+            if lr.run.provider != "self-hosted" or not lr.run.hardware:
+                continue
+            hw = lr.run.hardware
+            cell = rigs_agg[(hw.device or "", hw.gpu or "")]
+            cell["run_count"] += 1
+            cell["stages"].extend(lr.run.stages)
+            cell["models"].add(lr.run.model)
+            if lr.run.framework:
+                cell["frameworks"].add(lr.run.framework)
+            cell["vram_gb"] = max(cell["vram_gb"], hw.vram_gb or 0)
+            cell["ram_gb"]  = max(cell["ram_gb"],  hw.ram_gb  or 0)
+        rig_rows = [
+            {
+                **_stage_perf(cell["stages"]),
+                "device":      dev or None,
+                "gpu":         gpu or None,
+                "vram_gb":     cell["vram_gb"],
+                "ram_gb":      cell["ram_gb"],
+                "models":      sorted(cell["models"]),
+                "frameworks":  sorted(cell["frameworks"]),
+                "run_count":   cell["run_count"],
+                "stage_count": len(cell["stages"]),
+            }
+            for (dev, gpu), cell in rigs_agg.items()
+        ]
+        rig_rows.sort(
+            key=lambda r: (
+                r["avg_tokens_per_sec"] or 0,
+                -(r["avg_duration_sec"] or 1e9),
+                r["avg_rating_score"]   or 0,
+            ),
+            reverse=True,
+        )
+
         runs = [_run_summary(lr, lt) for lt, lr in items]
         runs.sort(key=lambda r: r["date"], reverse=True)
 
@@ -732,6 +809,8 @@ def build_contributors(loaded: dict[str, LoadedTest]) -> dict[str, list[dict]]:
             "first_date":         first.isoformat() if first else None,
             "latest_date":        latest.isoformat() if latest else None,
             "top_combo":          top_combo,
+            "top_rig":            top_rig,
+            "rigs":               rig_rows,
             "runs":               runs,
         })
 
@@ -861,13 +940,16 @@ def _compact_run(r: dict) -> dict:
 
 def _compact_test(t: dict) -> dict:
     return {
-        "name":         t["name"],
-        "title":        t["title"],
-        "description":  t["description"],
-        "domain":       t["domain"],
-        "stages_total": t["stages_total"],
-        "run_count":    t["run_count"],
-        "top_score":    t["runs"][0]["avg_rating_score"] if t["runs"] else None,
+        "name":               t["name"],
+        "title":              t["title"],
+        "description":        t["description"],
+        "domain":             t["domain"],
+        "contributor_handle": t["contributor_handle"],
+        "contributor_url":    t["contributor_url"],
+        "contributor_avatar": t["contributor_avatar"],
+        "stages_total":       t["stages_total"],
+        "run_count":          t["run_count"],
+        "top_score":          t["runs"][0]["avg_rating_score"] if t["runs"] else None,
     }
 
 
@@ -919,14 +1001,17 @@ def render(out_dir: Path, github_url: str) -> None:
     # ── per-test detail (prompts + compact runs list) ──
     for t in per_test:
         _write_json(out_dir / "tests" / f"{t['name']}.json", {
-            "name":         t["name"],
-            "title":        t["title"],
-            "description":  t["description"],
-            "domain":       t["domain"],
-            "stages_total": t["stages_total"],
-            "run_count":    t["run_count"],
-            "test_stages":  t["test_stages"],
-            "runs":         [_compact_run(r) for r in t["runs"]],
+            "name":               t["name"],
+            "title":              t["title"],
+            "description":        t["description"],
+            "domain":             t["domain"],
+            "contributor_url":    t["contributor_url"],
+            "contributor_handle": t["contributor_handle"],
+            "contributor_avatar": t["contributor_avatar"],
+            "stages_total":       t["stages_total"],
+            "run_count":          t["run_count"],
+            "test_stages":        t["test_stages"],
+            "runs":               [_compact_run(r) for r in t["runs"]],
         })
 
     # ── per-run detail (full stage data, hardware, settings, notes) ──

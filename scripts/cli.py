@@ -337,11 +337,20 @@ class TestStage(BaseModel):
 
 
 class Test(BaseModel):
+    contributor_url: str                # URL identifying the test's author (same convention as run.yaml).
     name: str
     title: str
     description: str
     domain: Optional[DomainT] = None
     stages: list[TestStage]
+
+    @field_validator("contributor_url")
+    @classmethod
+    def _check_contributor_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("must be a URL starting with http:// or https://")
+        return v
 
 
 # --------------------------------------------------------------------------- #
@@ -1039,6 +1048,12 @@ class TestAddScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll(id="content"):
+            yield Label("Your contributor URL (GitHub profile, personal site, Mastodon, etc.):", classes="field-label")
+            yield Input(placeholder="https://github.com/your-username", id="contributor-url")
+            yield Label(
+                "This identifies you on the site. Use the same URL for all your tests and runs so they group under one profile.",
+                classes="help-text",
+            )
             yield Label("Name (test directory, kebab-case):", classes="field-label")
             yield Input(placeholder="e.g. live-message-wall", id="name")
             yield Label("Short human-readable title:", classes="field-label")
@@ -1068,7 +1083,7 @@ class TestAddScreen(Screen):
         self.app.sub_title = "new test"
         table = self.query_one("#stages-table", DataTable)
         table.add_columns("#", "ID", "Theme", "Builds on")
-        self.query_one("#name", Input).focus()
+        self.query_one("#contributor-url", Input).focus()
 
     def _refresh_stages(self) -> None:
         table = self.query_one("#stages-table", DataTable)
@@ -1106,6 +1121,7 @@ class TestAddScreen(Screen):
         self.action_save()
 
     def action_save(self) -> None:
+        contributor_url = self.query_one("#contributor-url", Input).value.strip()
         name = self.query_one("#name", Input).value.strip()
         title = self.query_one("#title", Input).value.strip()
         description = self.query_one("#description", TextArea).text.strip()
@@ -1114,6 +1130,10 @@ class TestAddScreen(Screen):
         domain = str(dv) if dv not in (Select.BLANK, None) else None
 
         errors: list[str] = []
+        if not contributor_url:
+            errors.append("Contributor URL is required — it identifies you on the site.")
+        elif not contributor_url.startswith(("http://", "https://")):
+            errors.append("Contributor URL must start with http:// or https://.")
         if not name or not is_kebab_case(name):
             errors.append("Name must be kebab-case (lowercase letters/digits/dashes).")
         target_dir = TESTS_DIR / name if name else None
@@ -1131,6 +1151,7 @@ class TestAddScreen(Screen):
 
         try:
             test = Test(
+                contributor_url=contributor_url,
                 name=name,
                 title=title,
                 description=description,

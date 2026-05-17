@@ -1,3 +1,4 @@
+contributor_url: https://github.com/tin-cat   # the URL that identifies the author of this test on the site
 name: live-message-wall
 title: A live message wall
 description: |

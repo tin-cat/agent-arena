@@ -89,14 +89,18 @@ const COMMON_TOOLTIP = {
 /* ════════════════════════════════════════════════════════════════════════
    Lazy-loaded data — sharded JSON, fetched on demand, cached in memory
    ════════════════════════════════════════════════════════════════════════ */
+// Bust the browser cache whenever the site is rebuilt — without this, a stale
+// JSON shard (e.g. one missing a newly-added field) keeps getting served.
+const _BUILD_VER = DATA.build_date || '';
 const _jsonCache = new Map();
 function loadJSON(path) {
   if (_jsonCache.has(path)) return _jsonCache.get(path);
-  const p = fetch(path, { cache: 'force-cache' }).then((r) => {
+  const url = _BUILD_VER ? `${path}?v=${encodeURIComponent(_BUILD_VER)}` : path;
+  const p = fetch(url).then((r) => {
     if (!r.ok) throw new Error(`Could not load ${path} (HTTP ${r.status})`);
     return r.json();
   }).catch((err) => {
-    _jsonCache.delete(path);  // allow retry on next visit
+    _jsonCache.delete(path);
     throw err;
   });
   _jsonCache.set(path, p);
@@ -428,7 +432,7 @@ function testListItemHTML(t, isActive) {
   return `<a class="test-list-item ${isActive ? 'active' : ''}" href="#/tests/${esc(t.name)}">
     <div class="name">${esc(t.name)}${t.domain ? ` · ${esc(t.domain)}` : ''}</div>
     <div class="title">${esc(t.title)}</div>
-    <div class="meta">${t.run_count} run${t.run_count === 1 ? '' : 's'} · ${t.stages_total} stage${t.stages_total === 1 ? '' : 's'}${t.top_score != null ? ` · top ${fmtScore(t.top_score)}` : ''}</div>
+    <div class="meta">${t.run_count} run${t.run_count === 1 ? '' : 's'} · ${t.stages_total} stage${t.stages_total === 1 ? '' : 's'}${t.top_score != null ? ` · top ${fmtScore(t.top_score)}` : ''}${t.contributor_handle ? ` · by ${esc(t.contributor_handle)}` : ''}</div>
   </a>`;
 }
 
@@ -448,6 +452,7 @@ function testDetailHTML(t) {
       <div class="panel-body">
         <p style="margin:0 0 16px; color:var(--text-dim)">${esc(t.description)}</p>
         <div class="kv-grid">
+          ${t.contributor_handle ? `<div><span class="k">authored by</span><span class="v"><a href="#/contributors/${encodeURIComponent(t.contributor_handle)}">${esc(t.contributor_handle)}</a></span></div>` : ''}
           <div><span class="k">stages</span><span class="v">${t.stages_total}</span></div>
           <div><span class="k">contributed runs</span><span class="v">${t.run_count}</span></div>
           <div><span class="k">top score</span><span class="v t-cyan">${fmtScore(t.runs[0]?.avg_rating_score)}</span></div>
@@ -765,6 +770,7 @@ async function renderContributorProfile(handle, gen) {
           <h1 class="profile-handle">${esc(p.handle)}</h1>
           <p class="profile-link"><a href="${esc(p.url)}" rel="noopener">${esc(p.url)}</a></p>
           ${p.top_combo ? `<div class="profile-meta">favorite stack · <b>${esc(p.top_combo)}</b></div>` : ''}
+          ${p.top_rig ? `<div class="profile-meta">weapon of choice · <b>${esc(p.top_rig)}</b></div>` : ''}
           <div class="profile-meta">active ${esc(p.first_date)} → ${esc(p.latest_date)}</div>
         </div>
         <div class="profile-stats">
@@ -799,6 +805,69 @@ async function renderContributorProfile(handle, gen) {
         <div class="panel-body"><div class="chart-box"><canvas id="contribRatingChart"></canvas></div></div>
       </div>
     </div>
+
+    ${(p.rigs && p.rigs.length) ? `
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">arsenal</span>
+          <span class="panel-actions t-mute">${p.rigs.length} rig${p.rigs.length === 1 ? '' : 's'} · most performant first</span>
+        </div>
+        <div class="panel-body dense">
+          <table>
+            <thead><tr>
+              <th class="rank">#</th>
+              <th>device · gpu</th>
+              <th class="num">vram</th>
+              <th class="num">ram</th>
+              <th>models run</th>
+              <th>framework</th>
+              <th class="num">tok/s</th>
+              <th class="num">avg time</th>
+              <th>score</th>
+              <th class="num">runs · stages</th>
+            </tr></thead>
+            <tbody>${p.rigs.map((r, i) => `
+              <tr>
+                <td class="rank${i === 0 ? ' top' : ''}">${i + 1}</td>
+                <td><b>${esc(r.device || '—')}</b>${r.gpu ? ` · <span class="t-dim">${esc(r.gpu)}</span>` : ''}</td>
+                <td class="num">${r.vram_gb ? r.vram_gb + ' gb' : '—'}</td>
+                <td class="num">${r.ram_gb ? r.ram_gb + ' gb' : '—'}</td>
+                <td>${r.models.map((m) => `<span class="pill muted">${esc(m)}</span>`).join(' ') || '<span class="t-mute">—</span>'}</td>
+                <td>${r.frameworks.length ? r.frameworks.map((f) => `<span class="pill">${esc(f)}</span>`).join(' ') : '<span class="t-mute">—</span>'}</td>
+                <td class="num t-cyan">${r.avg_tokens_per_sec != null ? Number(r.avg_tokens_per_sec).toFixed(1) : '—'}</td>
+                <td class="num">${fmtDuration(r.avg_duration_sec)}</td>
+                <td style="min-width:140px">${bar(r.avg_rating_score)}</td>
+                <td class="num">${r.run_count} · ${r.stage_count}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ` : ''}
+
+    ${(() => {
+      const authored = (DATA.tests || []).filter((x) => x.contributor_handle === p.handle);
+      if (!authored.length) return '';
+      return `
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title alt">tests authored</span><span class="panel-actions t-mute">${authored.length} test${authored.length === 1 ? '' : 's'}</span></div>
+          <div class="panel-body dense">
+            <table>
+              <thead><tr><th>test</th><th>domain</th><th class="num">stages</th><th class="num">runs</th><th class="num">top score</th></tr></thead>
+              <tbody>${authored.map((t) => `
+                <tr class="clickable" onclick="location.hash='#/tests/${esc(t.name)}'">
+                  <td><a href="#/tests/${esc(t.name)}">${esc(t.title)}</a> <span class="pill muted">${esc(t.name)}</span></td>
+                  <td>${t.domain ? `<span class="pill">${esc(t.domain)}</span>` : '<span class="t-mute">—</span>'}</td>
+                  <td class="num">${t.stages_total}</td>
+                  <td class="num">${t.run_count}</td>
+                  <td class="num t-cyan">${fmtScore(t.top_score)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    })()}
 
     <div class="panel">
       <div class="panel-head"><span class="panel-title">all contributed runs</span><span class="panel-actions t-mute">${p.runs.length} run${p.runs.length === 1 ? '' : 's'}</span></div>
