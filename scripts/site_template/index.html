@@ -15,11 +15,15 @@
 </head>
 <body>
 <div class="scanlines" aria-hidden="true"></div>
+<div class="nav-backdrop" id="navBackdrop" aria-hidden="true"></div>
 
 <div class="app" id="app">
 
   <!-- ════════════════════════════════════════════════════════════════════════ -->
   <header class="titlebar">
+    <button class="hamburger" id="hamburger" aria-label="Open menu" aria-controls="navList" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
     <a class="titlebar-left brand-link" href="#/overview" aria-label="Home — overview">
       <pre class="brand-logo" aria-hidden="true"> <span>▄</span>        <span>▄</span>
   <span>▀▄</span>    <span>▄▀</span>
@@ -83,15 +87,13 @@
   <footer class="statusbar" id="statusbar">
     <div class="statusbar-left">
       <span class="status-pill" id="statusRoute">▌ overview</span>
-      <span class="status-divider">│</span>
-      <span class="status-text">{{ summary.tests }} tests · {{ summary.runs }} runs · {{ summary.stages }} stages · {{ summary.contributors }} contributors</span>
+      <span class="status-divider hide-sm">│</span>
+      <span class="status-text hide-sm">{{ summary.tests }} tests · {{ summary.runs }} runs · {{ summary.stages }} stages · {{ summary.contributors }} contributors</span>
     </div>
     <div class="statusbar-right">
-      <span class="status-text">tin.cat / agentarena</span>
-      <span class="status-divider">│</span>
+      <a class="status-text" href="https://tin.cat" rel="noopener">❤️ tin.cat</a>
+      <span class="status-divider hide-sm">│</span>
       <a class="status-text" href="https://twitter.com/lorenzoherrera" rel="noopener">@lorenzoherrera</a>
-      <span class="status-divider">│</span>
-      <span class="status-text status-text-mute">v{{ build_date }}</span>
     </div>
   </footer>
 

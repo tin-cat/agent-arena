@@ -961,6 +961,26 @@ $('#helpClose').addEventListener('click', () => { $('#helpModal').hidden = true;
 $('#helpModal').addEventListener('click', (e) => { if (e.target.id === 'helpModal') e.currentTarget.hidden = true; });
 
 /* ════════════════════════════════════════════════════════════════════════
+   Mobile drawer (sidebar toggle on narrow screens)
+   ════════════════════════════════════════════════════════════════════════ */
+function setNavOpen(open) {
+  document.body.classList.toggle('nav-open', open);
+  $('#hamburger')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+$('#hamburger')?.addEventListener('click', () => {
+  setNavOpen(!document.body.classList.contains('nav-open'));
+});
+$('#navBackdrop')?.addEventListener('click', () => setNavOpen(false));
+// Close the drawer whenever the user picks a sidebar entry.
+$('#navList')?.addEventListener('click', (e) => {
+  if (e.target.closest('.nav-item')) setNavOpen(false);
+});
+// Esc closes the drawer (in addition to its existing back/close behavior).
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('nav-open')) setNavOpen(false);
+});
+
+/* ════════════════════════════════════════════════════════════════════════
    Boot
    ════════════════════════════════════════════════════════════════════════ */
 // replaceState (rather than assigning to location.hash) avoids firing an extra
