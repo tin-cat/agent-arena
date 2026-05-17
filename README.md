@@ -5,11 +5,11 @@
 
 [➜ See current test results](https://agentarena.tin.cat)
 
-Pick your favorite AI coding setup — agent, model, provider or your own self-hosted rig if you're feeling spicy. Run one of the tests, and send a PR with the results. Your handle goes on the [leaderboard](https://agentarena.tin.cat). Your rig joins the silicon beasts roster.
+Pick your favorite AI coding setup: agent, model, provider or your own self-hosted rig if you're feeling spicy. Run one of the tests, and send a PR with the results. Your handle goes on the [leaderboard](https://agentarena.tin.cat). Your rig joins the silicon beasts roster.
 
 Each test is a multi-stage gauntlet: an unattended first build, then progressively harder refinements. Setups that one-shot the easy stuff but fall apart on follow-up work get exposed.
 
-The leaderboard is fun, but the goal is real: a community-run, real-world view of how agentic AI coding setups *actually* perform on tasks they'll be asked to do — the kind of comparison vendor benchmarks rarely give you. Cloud vs. self-hosted, frontier vs. open-weight, high-effort vs. fast — all on the same prompts, on the same scale.
+The leaderboard is fun, but the goal is real: a community-run, real-world view of how agentic AI coding setups *actually* perform on tasks they'll be asked to do: the kind of comparison vendor benchmarks rarely give you. Cloud vs. self-hosted, frontier vs. open-weight, high-effort vs. fast — all on the same prompts, on the same scale.
 
 ---
 
