@@ -210,11 +210,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TESTS_DIR = REPO_ROOT / "tests"
 
 LOGO = (
-    "[cyan]   ▄▄▄▄▄▄▄▄  [/]\n"
-    "[cyan]  ▐█ [/][bold magenta]▀▄▄▀[/][cyan] █▌ [/]\n"
-    "[cyan]  ▐█  ▀▀  █▌ [/]\n"
-    "[cyan]   ▀██████▀  [/]\n"
-    "[cyan]    ▄▀  ▀▄   [/]"
+    "[bold cyan] ▄[/]        [bold cyan]▄[/] \n"
+    "[bold cyan]  ▀▄[/]    [bold cyan]▄▀[/]  \n"
+    "[bold cyan]    ▀▄[/][cyan]▄[/][bold cyan]▀[/]    \n"
+    "[bold cyan]    ▄[/][cyan]▀[/][bold cyan]▀▄[/]    \n"
+    "[bold magenta] █[/][cyan]▄▀[/]    [cyan]▀▄[/][magenta]█[/] \n"
+    "[bold magenta]▄[/][magenta]▀▀▀[/]    [bold magenta]▀▀[/][magenta]▀[/][bold magenta]▄[/]"
 )
 
 RATINGS = ("excellent", "good", "partial", "failed")

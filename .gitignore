@@ -3,3 +3,10 @@ scripts/.venv/
 
 # Generated stats site (rebuilt by GitHub Actions on every push to main)
 site/
+
+# Mockup tests are not committed
+tests/csv-analyzer
+tests/markdown-to-html
+tests/pixel-canvas
+tests/rest-api-todo
+tests/snake-game
