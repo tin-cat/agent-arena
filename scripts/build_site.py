@@ -519,6 +519,178 @@ def build_activity(loaded: dict[str, LoadedTest]) -> list[dict]:
     return [{"date": d, "count": c} for d, c in sorted(by_date.items())]
 
 
+def build_hardware(loaded: dict[str, LoadedTest]) -> dict:
+    """Self-hosted-only aggregates for the 'silicon beasts' section.
+    Returns headline totals, per-device / per-GPU / per-contributor rankings,
+    and a hardware-combo leaderboard sorted by throughput."""
+    sh_runs: list[tuple[LoadedTest, LoadedRun, Hardware]] = []
+    for lt in loaded.values():
+        for lr in lt.runs:
+            if lr.run.provider != "self-hosted" or not lr.run.hardware:
+                continue
+            sh_runs.append((lt, lr, lr.run.hardware))
+
+    empty = {
+        "headline":     {"devices": 0, "vram_gb": 0, "ram_gb": 0,
+                          "contributors": 0, "runs": 0, "stages": 0},
+        "combos":       [],
+        "by_device":    [],
+        "by_gpu":       [],
+        "contributors": [],
+    }
+    if not sh_runs:
+        return empty
+
+    # Unique (contributor, device) → headline VRAM/RAM totals (avoid double-counting
+    # the same device when a contributor submits multiple runs from it).
+    unique_devices: dict[tuple[str, str], dict[str, int]] = {}
+    for _, lr, hw in sh_runs:
+        key = (lr.run.contributor_url, hw.device or "(unknown device)")
+        cell = unique_devices.setdefault(key, {"vram_gb": 0, "ram_gb": 0})
+        cell["vram_gb"] = max(cell["vram_gb"], hw.vram_gb or 0)
+        cell["ram_gb"]  = max(cell["ram_gb"],  hw.ram_gb  or 0)
+    total_vram = sum(d["vram_gb"] for d in unique_devices.values())
+    total_ram  = sum(d["ram_gb"]  for d in unique_devices.values())
+
+    def _stage_perf(stages: list[RunStage]) -> dict:
+        if not stages:
+            return {"avg_rating_score": None, "avg_duration_sec": None, "avg_tokens_per_sec": None}
+        score = rating_score(stages)
+        avg_dur = sum(s.duration_sec for s in stages) / len(stages)
+        tok_stages = [s for s in stages if s.tokens_out and s.duration_sec > 0]
+        avg_tps = (
+            sum(s.tokens_out / s.duration_sec for s in tok_stages) / len(tok_stages)
+            if tok_stages else None
+        )
+        return {
+            "avg_rating_score":   score,
+            "avg_duration_sec":   avg_dur,
+            "avg_tokens_per_sec": avg_tps,
+        }
+
+    # ── Hardware combos (device + gpu + framework + model + quantization) ──
+    combos: dict[tuple[str, ...], list[tuple[LoadedTest, LoadedRun, Hardware]]] = defaultdict(list)
+    for lt, lr, hw in sh_runs:
+        key = (
+            hw.device or "(unknown)",
+            hw.gpu or "(none)",
+            lr.run.framework or "",
+            lr.run.model,
+            lr.run.quantization or "",
+        )
+        combos[key].append((lt, lr, hw))
+
+    combo_rows: list[dict] = []
+    for _key, items in combos.items():
+        stages = [s for _, lr, _ in items for s in lr.run.stages]
+        if not stages:
+            continue
+        first_hw = items[0][2]
+        first_run = items[0][1].run
+        combo_rows.append({
+            **_stage_perf(stages),
+            "device":            first_hw.device,
+            "gpu":               first_hw.gpu,
+            "framework":         first_run.framework,
+            "model":             first_run.model,
+            "quantization":      first_run.quantization,
+            "vram_gb":           first_hw.vram_gb,
+            "ram_gb":            first_hw.ram_gb,
+            "run_count":         len(items),
+            "stage_count":       len(stages),
+            "contributor_count": len({lr.run.contributor_url for _, lr, _ in items}),
+        })
+    # Rank by tokens/sec when available, otherwise by inverse avg duration.
+    combo_rows.sort(
+        key=lambda r: (
+            r["avg_tokens_per_sec"] or 0,
+            -(r["avg_duration_sec"] or 1e9),
+            r["avg_rating_score"]   or 0,
+        ),
+        reverse=True,
+    )
+    for i, r in enumerate(combo_rows):
+        r["rank"] = i + 1
+
+    # ── Per-device aggregate (device name only) ──
+    by_device: dict[str, list] = defaultdict(list)
+    for lt, lr, hw in sh_runs:
+        by_device[hw.device or "(unknown)"].append((lt, lr, hw))
+    device_rows = [
+        {
+            **_stage_perf([s for _, lr, _ in items for s in lr.run.stages]),
+            "device":            dev,
+            "run_count":         len(items),
+            "stage_count":       sum(len(lr.run.stages) for _, lr, _ in items),
+            "contributor_count": len({lr.run.contributor_url for _, lr, _ in items}),
+        }
+        for dev, items in by_device.items()
+    ]
+    device_rows.sort(key=lambda r: (r["avg_tokens_per_sec"] or 0, r["stage_count"]), reverse=True)
+
+    # ── Per-GPU aggregate ──
+    by_gpu: dict[str, list] = defaultdict(list)
+    for lt, lr, hw in sh_runs:
+        by_gpu[hw.gpu or "(none)"].append((lt, lr, hw))
+    gpu_rows = [
+        {
+            **_stage_perf([s for _, lr, _ in items for s in lr.run.stages]),
+            "gpu":               gpu,
+            "run_count":         len(items),
+            "stage_count":       sum(len(lr.run.stages) for _, lr, _ in items),
+            "contributor_count": len({lr.run.contributor_url for _, lr, _ in items}),
+        }
+        for gpu, items in by_gpu.items()
+    ]
+    gpu_rows.sort(key=lambda r: (r["avg_tokens_per_sec"] or 0, r["stage_count"]), reverse=True)
+
+    # ── Per-contributor self-hosted leaderboard ──
+    by_contrib: dict[str, list] = defaultdict(list)
+    for lt, lr, hw in sh_runs:
+        by_contrib[lr.run.contributor_url].append((lt, lr, hw))
+    contrib_rows = []
+    for url, items in by_contrib.items():
+        stages = [s for _, lr, _ in items for s in lr.run.stages]
+        devices = sorted({hw.device for _, _, hw in items if hw.device})
+        gpus    = sorted({hw.gpu    for _, _, hw in items if hw.gpu})
+        total_v = sum(unique_devices[(url, d)]["vram_gb"] for d in devices)
+        total_r = sum(unique_devices[(url, d)]["ram_gb"]  for d in devices)
+        contrib_rows.append({
+            **_stage_perf(stages),
+            "url":           url,
+            "handle":        handle_from_url(url),
+            "avatar_url":    avatar_from_url(url),
+            "run_count":     len(items),
+            "stage_count":   len(stages),
+            "device_count":  len(devices),
+            "devices":       devices,
+            "gpus":          gpus,
+            "total_vram_gb": total_v,
+            "total_ram_gb":  total_r,
+        })
+    contrib_rows.sort(
+        key=lambda r: (r["stage_count"], r["total_vram_gb"], r["avg_rating_score"] or 0),
+        reverse=True,
+    )
+    for i, r in enumerate(contrib_rows):
+        r["rank"] = i + 1
+
+    return {
+        "headline": {
+            "devices":      len(unique_devices),
+            "vram_gb":      total_vram,
+            "ram_gb":       total_ram,
+            "contributors": len(by_contrib),
+            "runs":         len(sh_runs),
+            "stages":       sum(len(lr.run.stages) for _, lr, _ in sh_runs),
+        },
+        "combos":       combo_rows,
+        "by_device":    device_rows,
+        "by_gpu":       gpu_rows,
+        "contributors": contrib_rows,
+    }
+
+
 def build_contributors(loaded: dict[str, LoadedTest]) -> dict[str, list[dict]]:
     """Per-contributor profiles (ranked) + latest contributions feed."""
     # Pair every run with its containing test so we can build per-contributor run lists.
@@ -715,6 +887,7 @@ def render(out_dir: Path, github_url: str) -> None:
     all_runs     = build_all_runs(loaded)
     contributors = build_contributors(loaded)
     activity     = build_activity(loaded)
+    hardware     = build_hardware(loaded)
 
     # ── index payload — always loaded by the SPA. Small, no per-run details. ──
     index_data = {
@@ -728,6 +901,7 @@ def render(out_dir: Path, github_url: str) -> None:
         "scatter":      scatter,
         "theme_stats":  theme_stats,
         "activity":     activity,
+        "hardware":     hardware,
         "tests":        [_compact_test(t) for t in per_test],
         "contributors": {
             "profiles": [_compact_profile(p) for p in contributors["profiles"]],
@@ -774,6 +948,7 @@ def render(out_dir: Path, github_url: str) -> None:
         "scatter":      scatter,
         "theme_stats":  theme_stats,
         "activity":     activity,
+        "hardware":     hardware,
         "all_runs":     all_runs,
         "tests":        per_test,
         "contributors": contributors,

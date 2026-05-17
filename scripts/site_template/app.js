@@ -135,6 +135,7 @@ const routes = [
   { pat: /^\/runs\/([^/]+)\/([^/]+)$/,                  name: 'runs',         handler: (m, gen) => renderRunDetail(m[1], m[2], 'runs', gen) },
   { pat: /^\/contributors$/,                            name: 'contributors', handler: (_m, gen) => renderContributors(gen) },
   { pat: /^\/contributors\/([^/]+)$/,                   name: 'contributors', handler: (m, gen) => renderContributorProfile(decodeURIComponent(m[1]), gen) },
+  { pat: /^\/hardware$/,                                name: 'hardware',     handler: (_m, gen) => renderHardware(gen) },
 ];
 
 function parseHash() {
@@ -807,6 +808,162 @@ async function renderContributorProfile(handle, gen) {
   mountContribRatingChart(p);
 }
 
+/* ─────────────────────────── 06 · SILICON BEASTS ─────────────────────────── */
+function renderHardware() {
+  const h = DATA.hardware || { headline: { devices: 0, vram_gb: 0, ram_gb: 0, contributors: 0, runs: 0, stages: 0 }, combos: [], by_device: [], by_gpu: [], contributors: [] };
+  const hd = h.headline;
+
+  view().innerHTML = `
+    ${viewHead('silicon beasts', '06', 'A roll-call of the self-hosted rigs powering local inference in this benchmark. Speed, hardware, and the contributors who threw silicon at the problem.')}
+
+    ${hd.runs === 0 ? `
+      <div class="panel"><div class="panel-body t-mute">No self-hosted runs yet — contribute one to launch this section.</div></div>
+    ` : `
+      <div class="metric-grid">
+        <div class="metric cy"><div class="label">unique devices</div><div class="value">${hd.devices}</div><div class="sub">deduped per contributor</div></div>
+        <div class="metric cy"><div class="label">total vram</div><div class="value">${hd.vram_gb} <span style="font-size:14px;color:var(--text-mute)">gb</span></div><div class="sub">across all rigs</div></div>
+        <div class="metric"><div class="label">total ram</div><div class="value">${hd.ram_gb} <span style="font-size:14px;color:var(--text-mute)">gb</span></div><div class="sub">across all rigs</div></div>
+        <div class="metric alt"><div class="label">contributors</div><div class="value">${hd.contributors}</div><div class="sub">running local</div></div>
+        <div class="metric"><div class="label">self-hosted runs</div><div class="value">${hd.runs}</div><div class="sub">${hd.stages} stages</div></div>
+      </div>
+
+      <div class="split-2">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">throughput by device</span><span class="panel-actions t-mute">tokens / sec, avg over stages</span></div>
+          <div class="panel-body"><div class="chart-box"><canvas id="hwDeviceChart"></canvas></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title alt">throughput by GPU</span><span class="panel-actions t-mute">tokens / sec, avg over stages</span></div>
+          <div class="panel-body"><div class="chart-box"><canvas id="hwGpuChart"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">most performant rigs</span><span class="panel-actions t-mute">${h.combos.length} unique combo${h.combos.length === 1 ? '' : 's'}</span></div>
+        <div class="panel-body dense">${hardwareCombosHTML(h.combos)}</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title alt">silicon beasts roster</span><span class="panel-actions t-mute">${h.contributors.length} contributor${h.contributors.length === 1 ? '' : 's'}</span></div>
+        <div class="panel-body dense">${hardwareContributorsHTML(h.contributors)}</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-body" style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+          <div class="t-dim" style="font-size:12px;">▌ got a workstation, an M-series, an exotic GPU? show off how it performs.</div>
+          <a class="cta cta-primary" href="${esc(DATA.github_url)}/blob/main/CONTRIBUTING.md" rel="noopener">+ contribute a self-hosted run</a>
+        </div>
+      </div>
+    `}
+  `;
+
+  if (hd.runs > 0) {
+    mountHwBarChart('hwDeviceChart', h.by_device, 'device');
+    mountHwBarChart('hwGpuChart',    h.by_gpu,    'gpu');
+  }
+}
+
+function hardwareCombosHTML(rows) {
+  if (!rows.length) return '<div style="padding:14px;color:var(--text-mute)">none yet.</div>';
+  return `<table>
+    <thead><tr>
+      <th class="rank">#</th>
+      <th>device · gpu</th>
+      <th>model</th>
+      <th>framework</th>
+      <th class="num">vram</th>
+      <th class="num">ram</th>
+      <th class="num">tok/s</th>
+      <th class="num">avg time</th>
+      <th>score</th>
+      <th class="num">runs · stages</th>
+    </tr></thead>
+    <tbody>${rows.map((r) => `
+      <tr>
+        <td class="rank${r.rank === 1 ? ' top' : ''}">${r.rank}</td>
+        <td><b>${esc(r.device || '—')}</b>${r.gpu ? ` · <span class="t-dim">${esc(r.gpu)}</span>` : ''}</td>
+        <td>${esc(r.model)}${r.quantization ? ` <span class="pill muted">${esc(r.quantization)}</span>` : ''}</td>
+        <td>${r.framework ? `<span class="pill">${esc(r.framework)}</span>` : '<span class="t-mute">—</span>'}</td>
+        <td class="num">${r.vram_gb ? r.vram_gb + ' gb' : '—'}</td>
+        <td class="num">${r.ram_gb ? r.ram_gb + ' gb' : '—'}</td>
+        <td class="num t-cyan">${r.avg_tokens_per_sec != null ? Number(r.avg_tokens_per_sec).toFixed(1) : '—'}</td>
+        <td class="num">${fmtDuration(r.avg_duration_sec)}</td>
+        <td style="min-width:140px">${bar(r.avg_rating_score)}</td>
+        <td class="num">${r.run_count} · ${r.stage_count}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function hardwareContributorsHTML(rows) {
+  if (!rows.length) return '<div style="padding:14px;color:var(--text-mute)">none yet.</div>';
+  return `<ul class="contrib-rank">${rows.map((r) => `
+    <li>
+      <a class="contrib-row" href="#/contributors/${encodeURIComponent(r.handle)}">
+        <span class="contrib-rank-n${r.rank === 1 ? ' top' : ''}">#${r.rank}</span>
+        ${avatarThumb(r, 36)}
+        <div class="contrib-id">
+          <div class="handle">${esc(r.handle)}</div>
+          <div class="sub">${r.devices.map(esc).join(' + ') || '(no device)'}${r.gpus.length ? ' · ' + r.gpus.map(esc).join(', ') : ''}</div>
+        </div>
+        <div class="contrib-nums">
+          <div><b>${r.total_vram_gb}</b><span>vram gb</span></div>
+          <div><b>${r.total_ram_gb}</b><span>ram gb</span></div>
+          <div><b>${r.stage_count}</b><span>stages</span></div>
+          <div><b>${r.avg_tokens_per_sec != null ? Number(r.avg_tokens_per_sec).toFixed(0) : '—'}</b><span>tok/s</span></div>
+        </div>
+        <div class="contrib-score">${bar(r.avg_rating_score)}</div>
+      </a>
+    </li>`).join('')}</ul>`;
+}
+
+function mountHwBarChart(canvasId, rows, fieldName) {
+  if (!rows.length) return;
+  // Prefer tokens/sec; fall back to avg duration (lower=faster) shown as negative bars only if no tokens at all.
+  const haveTokens = rows.some((r) => r.avg_tokens_per_sec != null);
+  const sortKey = haveTokens ? 'avg_tokens_per_sec' : 'avg_duration_sec';
+  const sorted = [...rows].sort((a, b) => (b[sortKey] || 0) - (a[sortKey] || 0)).slice(0, 12);
+  const labels = sorted.map((r) => r[fieldName] || '—');
+  const data   = haveTokens
+    ? sorted.map((r) => r.avg_tokens_per_sec || 0)
+    : sorted.map((r) => r.avg_duration_sec || 0);
+
+  makeChart(canvasId, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: sorted.map((_, i) => i === 0 ? '#ff6ad5' : 'rgba(90,209,255,.55)'),
+        borderColor:     sorted.map((_, i) => i === 0 ? '#ff6ad5' : '#5ad1ff'),
+        borderWidth: 1, borderRadius: 2,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...COMMON_TOOLTIP,
+          callbacks: {
+            label: (ctx) => {
+              const r = sorted[ctx.dataIndex];
+              return haveTokens
+                ? [`${ctx.raw.toFixed(1)} tok/s`, `${r.stage_count} stages · score ${(r.avg_rating_score ?? 0).toFixed(2)}`]
+                : [`${fmtDuration(ctx.raw)} avg`, `${r.stage_count} stages · score ${(r.avg_rating_score ?? 0).toFixed(2)}`];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { ...COMMON_SCALES,
+             title: { display: true, text: haveTokens ? 'tokens / second' : 'avg duration (sec)', color: '#5d6878', font: { size: 10 } } },
+        y: { ...COMMON_SCALES, ticks: { ...COMMON_SCALES.ticks, font: { size: 10 } } },
+      },
+    },
+  });
+}
+
 function mountContribRatingChart(p) {
   const buckets = { excellent: 0, good: 0, partial: 0, failed: 0 };
   for (const r of p.runs) for (const s of r.stages) if (buckets[s.rating] != null) buckets[s.rating]++;
@@ -1034,7 +1191,7 @@ function mountRunMetricChart(run) {
 /* ════════════════════════════════════════════════════════════════════════
    Keyboard shortcuts + help modal
    ════════════════════════════════════════════════════════════════════════ */
-const NAV_BY_KEY = { '1': '#/overview', '2': '#/leaderboard', '3': '#/tests', '4': '#/runs', '5': '#/contributors' };
+const NAV_BY_KEY = { '1': '#/overview', '2': '#/leaderboard', '3': '#/tests', '4': '#/runs', '5': '#/contributors', '6': '#/hardware' };
 let _gPrefix = false, _gTimer = null;
 
 document.addEventListener('keydown', (e) => {
