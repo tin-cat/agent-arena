@@ -10,3 +10,6 @@ tests/markdown-to-html
 tests/pixel-canvas
 tests/rest-api-todo
 tests/snake-game
+
+# Annoying files
+.DS_Store
