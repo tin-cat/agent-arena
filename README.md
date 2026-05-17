@@ -1,5 +1,6 @@
-# AI agentic coding tests
-Benchmarks for LLM models and agentic coding platforms across real-world coding tasks, providers, and hardware setups.
+# AgentArena
+*See how coding agents really perform across models, providers, and hardware.*  
+A community benchmark — contribute your runs and tests.
 
 This repository gives you a clearer picture of how different tools perform on real coding tasks. Useful if you're deciding, for example, whether a self-hosted inference setup or a cloud-based one is the better fit for your workflow.
 

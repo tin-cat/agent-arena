@@ -9,7 +9,7 @@
 #     "ruamel.yaml>=0.18",
 # ]
 # ///
-"""CLI for managing AI agentic coding tests and their runs.
+"""CLI for managing AgentArena tests and their runs.
 
 Just run it — dependencies install themselves on first run:
 
@@ -57,6 +57,43 @@ def _have_deps() -> bool:
         return False
 
 
+def _fail_setup(summary: str, hint: str, *, detail: str = "") -> None:
+    sys.stderr.write(f"\n[AgentArena CLI setup] {summary}\n")
+    if detail:
+        sys.stderr.write(f"  {detail}\n")
+    sys.stderr.write(f"\n{hint}\n")
+    sys.exit(1)
+
+
+def _check_python_version() -> None:
+    if sys.version_info < (3, 11):
+        current = ".".join(map(str, sys.version_info[:3]))
+        _fail_setup(
+            f"Python 3.11+ is required, but you're running Python {current}.",
+            hint=(
+                "Install a newer Python (via pyenv, asdf, uv, or your OS package manager),\n"
+                "then invoke this script with it explicitly, e.g.:\n"
+                f"  python3.11 {sys.argv[0]}"
+            ),
+        )
+
+
+def _check_venv_module() -> None:
+    # The stdlib `venv` module ships separately on some distros — most notably
+    # Debian/Ubuntu, where you need `apt install python3-venv`.
+    try:
+        import venv  # noqa: F401
+    except ImportError:
+        _fail_setup(
+            "The Python `venv` module is missing from this interpreter.",
+            hint=(
+                "On Debian/Ubuntu, install it with:\n"
+                "  sudo apt install python3-venv\n"
+                "On other systems, you may need to reinstall Python including the standard library."
+            ),
+        )
+
+
 def _bootstrap() -> None:
     # Already running inside the managed venv? Nothing to do.
     try:
@@ -69,35 +106,71 @@ def _bootstrap() -> None:
     if _have_deps():
         return
 
-    # Otherwise: create the venv if needed, install deps, then re-exec.
     expected = "\n".join(_DEPS)
     marker = _VENV / ".deps"
-    try:
-        if not _VENV_PY.exists():
-            sys.stderr.write("Setting up CLI dependencies in scripts/.venv (first run)...\n")
+
+    # Create the venv if missing. This uses the *current* interpreter, so it must
+    # satisfy our Python version requirement and have a working `venv` module.
+    if not _VENV_PY.exists():
+        _check_python_version()
+        _check_venv_module()
+        sys.stderr.write("Setting up CLI dependencies in scripts/.venv (first run)...\n")
+        try:
             subprocess.run(
                 [sys.executable, "-m", "venv", str(_VENV)],
                 check=True,
             )
-        if not marker.exists() or marker.read_text() != expected:
-            sys.stderr.write("Installing CLI dependencies...\n")
+        except subprocess.CalledProcessError as e:
+            _fail_setup(
+                "Failed to create the virtual environment at scripts/.venv.",
+                detail=f"`python -m venv` exited with status {e.returncode}",
+                hint=(
+                    "Common causes:\n"
+                    "  - Missing system package (Debian/Ubuntu: sudo apt install python3-venv)\n"
+                    "  - No write permission for the scripts/ directory\n"
+                    "  - Insufficient disk space"
+                ),
+            )
+
+    # Install or refresh deps inside the venv.
+    if not marker.exists() or marker.read_text() != expected:
+        sys.stderr.write("Installing CLI dependencies...\n")
+        try:
             subprocess.run(
                 [str(_VENV_PY), "-m", "pip", "install", "--quiet", *_DEPS],
                 check=True,
             )
-            marker.write_text(expected)
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write(
-            f"\nFailed to set up CLI dependencies: {e}\n"
-            "You can install them manually instead:\n"
-            f"  pip install {' '.join(_DEPS)}\n"
-        )
-        sys.exit(1)
+        except subprocess.CalledProcessError as e:
+            _fail_setup(
+                "Failed to install CLI dependencies into scripts/.venv.",
+                detail=f"`pip install` exited with status {e.returncode}",
+                hint=(
+                    "Common causes:\n"
+                    "  - No internet connection (pip couldn't reach PyPI)\n"
+                    "  - Corporate proxy or firewall blocking pip\n"
+                    "  - A corrupted venv — try deleting scripts/.venv and re-running\n"
+                    "\n"
+                    "To install the dependencies manually:\n"
+                    f"  {_VENV_PY} -m pip install {' '.join(_DEPS)}"
+                ),
+            )
+        marker.write_text(expected)
 
+    # Re-exec under the venv's Python so the rest of the file can import normally.
     args = [str(_VENV_PY), str(Path(__file__).resolve()), *sys.argv[1:]]
     if sys.platform == "win32":
         sys.exit(subprocess.run(args).returncode)
-    os.execv(str(_VENV_PY), args)
+    try:
+        os.execv(str(_VENV_PY), args)
+    except OSError as e:
+        _fail_setup(
+            "Could not re-launch the CLI inside its virtual environment.",
+            detail=f"os.execv failed: {e}",
+            hint=(
+                "Try invoking the venv's Python directly:\n"
+                f"  {_VENV_PY} {Path(__file__).resolve()} {' '.join(sys.argv[1:])}"
+            ),
+        )
 
 
 _bootstrap()
@@ -499,7 +572,7 @@ def _print_main_help(root: click.Group) -> None:
         prev_top = top
         table.add_row(signature, help_text)
 
-    console.print("[bold]Commands[/bold]")
+    console.print("[bold]Usage:[/bold]\n")
     console.print(table)
 
 
@@ -546,7 +619,7 @@ def test_list_cmd() -> None:
     if not names:
         console.print("[yellow]No tests found under /tests.[/yellow]")
         return
-    table = Table(title="Available tests", box=box.ROUNDED, header_style="bold cyan", title_style="bold")
+    table = Table(title="Available tests", box=box.ROUNDED, header_style="bold cyan", title_style="bold", title_justify="left")
     table.add_column("Name", style="bold")
     table.add_column("Stages", justify="right", style="dim")
     table.add_column("Runs", justify="right", style="dim")
@@ -625,7 +698,7 @@ def run_list_cmd(
         console.print(f"[yellow]No runs for '{test_name}' yet.[/yellow]")
         return
 
-    table = Table(title=f"Runs for {test_name}", box=box.ROUNDED, header_style="bold cyan", title_style="bold")
+    table = Table(title=f"Runs for {test_name}", box=box.ROUNDED, header_style="bold cyan", title_style="bold", title_justify="left")
     table.add_column("Run ID", style="bold")
     table.add_column("Date", style="dim")
     table.add_column("Contributor")
@@ -682,7 +755,7 @@ def run_show_cmd(
         meta.add_row("Hardware", ", ".join(f"{k}={v}" for k, v in hw_items.items()))
     console.print(Panel(meta, title=f"[bold]{run_id}[/bold]  [dim]{test_name}[/dim]", border_style="cyan", padding=(1, 1)))
 
-    stages_table = Table(title="Stages", box=box.ROUNDED, header_style="bold cyan", title_style="bold")
+    stages_table = Table(title="Stages", box=box.ROUNDED, header_style="bold cyan", title_style="bold", title_justify="left")
     stages_table.add_column("Stage", style="bold")
     stages_table.add_column("Time", justify="right")
     stages_table.add_column("In", justify="right", style="dim")
@@ -1166,7 +1239,7 @@ def validate_cmd(
         console.print("[green]✓ All YAML files valid.[/green]")
         return
 
-    table = Table(title="Validation errors", box=box.ROUNDED, header_style="bold red", title_style="bold red")
+    table = Table(title="Validation errors", box=box.ROUNDED, header_style="bold red", title_style="bold red", title_justify="left")
     table.add_column("File")
     table.add_column("Error")
     for p, msg in errors:
@@ -1185,18 +1258,18 @@ def validate_cmd(
 
 
 def _print_banner() -> None:
-    description = (
-        "Benchmarks for LLM models and agentic coding platforms across\n"
-        "real-world coding tasks, providers, and hardware setups."
+    title = "AgentArena"
+    tagline = (
+        "A community benchmark for coding agent performance"
     )
-    usage = "Usage: scripts/cli.py [OPTIONS] COMMAND [ARGS]..."
+    subtagline = "Contribute your tests and runs"
     right = (
         "\n"
-        f"[bold]{description}[/bold]\n"
-        "\n"
-        f"[dim]{usage}[/dim]"
+        f"[bold cyan]{title}[/bold cyan]\n"
+        f"[bold]{tagline}[/bold]\n"
+        f"[dim]{subtagline}[/dim]\n"
     )
-    grid = Table.grid(padding=(0, 3))
+    grid = Table.grid(padding=(0, 2))
     grid.add_column()
     grid.add_column()
     grid.add_row(LOGO, right)
