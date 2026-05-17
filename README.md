@@ -1,3 +1,5 @@
+<img src="logo.svg" alt="Alt text" width="200">
+
 # AgentArena
 **A community benchmark for AI coding agent performance**
 
