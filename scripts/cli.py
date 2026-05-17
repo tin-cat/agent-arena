@@ -13,13 +13,10 @@
 
 Just run it — dependencies install themselves on first run:
 
-    scripts/cli.py test list
-    scripts/cli.py test show live-message-wall
-    scripts/cli.py run list live-message-wall
-    scripts/cli.py run show live-message-wall <run-id>
-    scripts/cli.py run add
-    scripts/cli.py test add
-    scripts/cli.py validate
+    scripts/cli.py browse            # TUI for tests, runs, and their details
+    scripts/cli.py test add          # interactively create a new test
+    scripts/cli.py run add           # interactively record a run for a test
+    scripts/cli.py validate          # validate every test.yaml / run.yaml
 """
 from __future__ import annotations
 
@@ -40,6 +37,7 @@ _DEPS = (
     "questionary>=2.0",
     "pydantic>=2.6",
     "ruamel.yaml>=0.18",
+    "textual>=0.50",
 )
 _VENV = Path(__file__).resolve().parent / ".venv"
 _VENV_PY = _VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python3")
@@ -51,6 +49,7 @@ def _have_deps() -> bool:
         import pydantic     # noqa: F401
         import rich         # noqa: F401
         import ruamel.yaml  # noqa: F401
+        import textual      # noqa: F401
         import typer        # noqa: F401
         return True
     except ImportError:
@@ -197,6 +196,12 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 from ruamel.yaml import YAML
+from textual import on as _on_event
+from textual.app import App as _TextualApp, ComposeResult
+from textual.binding import Binding
+from textual.containers import VerticalScroll
+from textual.screen import Screen
+from textual.widgets import DataTable, Footer, Header, Label, Static
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 # --------------------------------------------------------------------------- #
@@ -537,6 +542,325 @@ def read_pasted_text(label: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Textual UI — the `browse` command launches AgentArenaApp at TestsScreen.
+# Esc walks up the stack (RunScreen / TestDetailsScreen → TestScreen →
+# TestsScreen → quit). Q quits from anywhere. The questionary-based `*_add`
+# forms are intentionally separate — they collect input, not display data.
+# --------------------------------------------------------------------------- #
+
+
+AGENT_ARENA_CSS = """
+Screen {
+    background: $background;
+}
+
+.section-title {
+    color: cyan;
+    text-style: bold;
+    margin: 1 1 0 1;
+}
+
+#test-info, #run-info {
+    border: round cyan;
+    padding: 0 1;
+    margin: 0 1 1 1;
+    height: auto;
+}
+
+.prompt-panel {
+    border: round $primary 50%;
+    padding: 0 1;
+    margin: 0 1 1 1;
+    height: auto;
+}
+
+.stage-meta {
+    margin: 0 1;
+}
+
+.error {
+    color: $error;
+    padding: 1 2;
+}
+
+DataTable {
+    margin: 0 1;
+}
+"""
+
+
+class TestsScreen(Screen):
+    """List all tests; Enter to drill into one."""
+
+    BINDINGS = [
+        Binding("escape,q", "app.quit", "Quit"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("Tests", classes="section-title")
+        yield DataTable(id="tests-table", zebra_stripes=True)
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = "Tests"
+        table = self.query_one("#tests-table", DataTable)
+        table.add_columns("Name", "Stages", "Runs", "Description")
+        names = list_test_names()
+        for name in names:
+            try:
+                t = load_test(name)
+                runs = len(list_run_ids(name))
+                table.add_row(
+                    name,
+                    str(len(t.stages)),
+                    str(runs),
+                    truncate(t.description, 80),
+                    key=name,
+                )
+            except (ValidationError, FileNotFoundError):
+                table.add_row(name, "?", "?", "[invalid]", key=name)
+        table.cursor_type = "row"
+        table.focus()
+        if not names:
+            self.notify("No tests found under /tests.", severity="warning")
+
+    @_on_event(DataTable.RowSelected)
+    def _open_test(self, event: DataTable.RowSelected) -> None:
+        name = str(event.row_key.value)
+        self.app.push_screen(TestScreen(name))
+
+
+class TestScreen(Screen):
+    """A test's info + its runs in a DataTable; drill into runs or details."""
+
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("q", "app.quit", "Quit"),
+        Binding("d", "show_details", "Test details"),
+    ]
+
+    def __init__(self, test_name: str) -> None:
+        super().__init__()
+        self.test_name = test_name
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static("", id="test-info")
+        yield Label("Runs", classes="section-title")
+        yield DataTable(id="runs-table", zebra_stripes=True)
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = self.test_name
+        try:
+            t = load_test(self.test_name)
+        except (FileNotFoundError, ValidationError) as e:
+            self.query_one("#test-info", Static).update(f"[red]Error: {e}[/red]")
+            return
+
+        runs = list_run_ids(self.test_name)
+        info_lines = [
+            f"[bold]{t.title}[/bold]",
+            t.description.strip(),
+        ]
+        meta = [f"[dim]Stages:[/dim] {len(t.stages)}", f"[dim]Runs:[/dim] {len(runs)}"]
+        if t.domain:
+            meta.insert(0, f"[dim]Domain:[/dim] {t.domain}")
+        info_lines.append("    ".join(meta))
+        self.query_one("#test-info", Static).update("\n".join(info_lines))
+
+        table = self.query_one("#runs-table", DataTable)
+        table.add_columns("Run ID", "Date", "Model", "Agent", "Stages")
+        for run_id in runs:
+            try:
+                r = load_run(self.test_name, run_id)
+                agent_str = r.agent.name + (f" ({r.agent.plan})" if r.agent.plan else "")
+                ratings = "  ".join(s.rating[0].upper() for s in r.stages)
+                table.add_row(run_id, r.date.isoformat(), r.model, agent_str, ratings, key=run_id)
+            except (ValidationError, FileNotFoundError):
+                table.add_row(run_id, "?", "?", "?", "[invalid]", key=run_id)
+        table.cursor_type = "row"
+        table.focus()
+
+    @_on_event(DataTable.RowSelected)
+    def _open_run(self, event: DataTable.RowSelected) -> None:
+        run_id = str(event.row_key.value)
+        self.app.push_screen(RunScreen(self.test_name, run_id))
+
+    def action_show_details(self) -> None:
+        self.app.push_screen(TestDetailsScreen(self.test_name))
+
+
+class TestDetailsScreen(Screen):
+    """Full test info — header + every stage's prompt."""
+
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("q", "app.quit", "Quit"),
+    ]
+
+    def __init__(self, test_name: str) -> None:
+        super().__init__()
+        self.test_name = test_name
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield VerticalScroll(id="content")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = f"{self.test_name} · details"
+        content = self.query_one("#content", VerticalScroll)
+        try:
+            t = load_test(self.test_name)
+        except (FileNotFoundError, ValidationError) as e:
+            content.mount(Static(f"[red]Error: {e}[/red]", classes="error"))
+            return
+
+        runs = len(list_run_ids(self.test_name))
+        info_lines = [
+            f"[bold]{t.title}[/bold]",
+            t.description.strip(),
+        ]
+        meta = [f"[dim]Stages:[/dim] {len(t.stages)}", f"[dim]Runs:[/dim] {runs}"]
+        if t.domain:
+            meta.insert(0, f"[dim]Domain:[/dim] {t.domain}")
+        info_lines.append("    ".join(meta))
+        content.mount(Static("\n".join(info_lines), id="test-info"))
+
+        for i, stage in enumerate(t.stages, 1):
+            content.mount(Label(f"Stage {i} — {stage.id}", classes="section-title"))
+            stage_meta = f"[dim]Theme:[/dim] {stage.theme}"
+            if stage.builds_on:
+                stage_meta += f"    [dim]Builds on:[/dim] {stage.builds_on}"
+            content.mount(Static(stage_meta, classes="stage-meta"))
+            content.mount(Static(stage.prompt.strip(), classes="prompt-panel"))
+
+
+class RunScreen(Screen):
+    """Full run info — metadata + per-stage metrics table."""
+
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("q", "app.quit", "Quit"),
+    ]
+
+    def __init__(self, test_name: str, run_id: str) -> None:
+        super().__init__()
+        self.test_name = test_name
+        self.run_id = run_id
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield VerticalScroll(id="content")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = f"{self.test_name} / {self.run_id}"
+        content = self.query_one("#content", VerticalScroll)
+        try:
+            r = load_run(self.test_name, self.run_id)
+        except (FileNotFoundError, ValidationError) as e:
+            content.mount(Static(f"[red]Error: {e}[/red]", classes="error"))
+            return
+
+        meta_lines = [
+            f"[dim]Contributor:[/dim] {r.contributor_url}",
+            f"[dim]Date:[/dim] {r.date.isoformat()}",
+        ]
+        agent_str = r.agent.name + (f" ({r.agent.plan})" if r.agent.plan else "")
+        meta_lines.append(f"[dim]Agent:[/dim] {agent_str}")
+        meta_lines.append(f"[dim]Provider:[/dim] {r.provider}")
+        if r.framework:
+            meta_lines.append(f"[dim]Framework:[/dim] {r.framework}")
+        meta_lines.append(f"[dim]Model:[/dim] {r.model}")
+        if r.quantization:
+            meta_lines.append(f"[dim]Quantization:[/dim] {r.quantization}")
+        if r.settings:
+            meta_lines.append("[dim]Settings:[/dim] " + ", ".join(f"{k}={v}" for k, v in r.settings.items()))
+        if r.hardware:
+            hw_items = r.hardware.model_dump(exclude_none=True)
+            meta_lines.append("[dim]Hardware:[/dim] " + ", ".join(f"{k}={v}" for k, v in hw_items.items()))
+        content.mount(Static("\n".join(meta_lines), id="run-info"))
+
+        content.mount(Label("Stages", classes="section-title"))
+        stages_table = DataTable(zebra_stripes=False, show_cursor=False, id="stages-table")
+        stages_table.add_columns("Stage", "Time", "In", "Out", "Cost", "Rating", "Notes")
+        total_dur = total_in = total_out = 0
+        total_cost = 0.0
+        for s in r.stages:
+            mins, secs = divmod(s.duration_sec, 60)
+            duration = f"{mins}:{secs:02d}"
+            tokens_in = f"{s.tokens_in:,}" if s.tokens_in is not None else "—"
+            tokens_out = f"{s.tokens_out:,}" if s.tokens_out is not None else "—"
+            cost = f"${s.cost_usd:.2f}" if s.cost_usd is not None else "—"
+            notes = truncate(s.notes or "", 60)
+            stages_table.add_row(s.id, duration, tokens_in, tokens_out, cost, s.rating, notes)
+            total_dur += s.duration_sec
+            total_in += s.tokens_in or 0
+            total_out += s.tokens_out or 0
+            total_cost += s.cost_usd or 0.0
+        mins, secs = divmod(total_dur, 60)
+        stages_table.add_row(
+            "total",
+            f"{mins}:{secs:02d}",
+            f"{total_in:,}" if total_in else "—",
+            f"{total_out:,}" if total_out else "—",
+            f"${total_cost:.2f}" if total_cost else "—",
+            "",
+            "",
+        )
+        content.mount(stages_table)
+
+
+class ValidateScreen(Screen):
+    """Validation results — one row per error."""
+
+    BINDINGS = [
+        Binding("escape,q", "app.quit", "Quit"),
+    ]
+
+    def __init__(self, errors: list[tuple[Path, str]]) -> None:
+        super().__init__()
+        self.errors = errors
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("Validation", classes="section-title")
+        yield DataTable(id="errors-table", zebra_stripes=True)
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = f"{len(self.errors)} error(s)" if self.errors else "✓ all valid"
+        table = self.query_one("#errors-table", DataTable)
+        table.add_columns("File", "Error")
+        for path, message in self.errors:
+            table.add_row(str(path), message)
+        table.cursor_type = "row"
+        if self.errors:
+            table.focus()
+        else:
+            self.notify("All YAML files valid.", severity="information")
+
+
+class AgentArenaApp(_TextualApp):
+    """Textual app for browsing AgentArena tests and runs."""
+
+    CSS = AGENT_ARENA_CSS
+    TITLE = "AgentArena"
+    BINDINGS = [Binding("ctrl+c", "quit", "Quit", show=False)]
+
+    def __init__(self, *, initial_stack: Optional[list[Screen]] = None) -> None:
+        super().__init__()
+        self._initial_stack: list[Screen] = initial_stack or [TestsScreen()]
+
+    def on_mount(self) -> None:
+        for screen in self._initial_stack:
+            self.push_screen(screen)
+
+
+# --------------------------------------------------------------------------- #
 # Typer app
 # --------------------------------------------------------------------------- #
 
@@ -564,16 +888,12 @@ def _print_main_help(root: click.Group) -> None:
     table.add_column(style="bold cyan", no_wrap=True)
     table.add_column()
 
-    prev_top = None
-    for path, signature, help_text in _walk_commands(root):
-        top = path.split()[0]
-        if prev_top is not None and top != prev_top:
-            table.add_row("", "")
-        prev_top = top
+    for _path, signature, help_text in _walk_commands(root):
         table.add_row(signature, help_text)
 
     console.print("[bold]Usage:[/bold]\n")
     console.print(table)
+    console.print()
 
 
 class _MainHelpGroup(typer.core.TyperGroup):
@@ -608,190 +928,15 @@ app.add_typer(run_app, name="run")
 
 
 # --------------------------------------------------------------------------- #
-# test list / show
+# browse  →  the TUI is now the only display command. It covers everything the
+# old `test list / show` and `run list / show` did, with full keyboard nav.
 # --------------------------------------------------------------------------- #
 
 
-@test_app.command("list")
-def test_list_cmd() -> None:
-    """List all tests in the repository."""
-    names = list_test_names()
-    if not names:
-        console.print("[yellow]No tests found under /tests.[/yellow]")
-        return
-    table = Table(title="Available tests", box=box.ROUNDED, header_style="bold cyan", title_style="bold", title_justify="left")
-    table.add_column("Name", style="bold")
-    table.add_column("Stages", justify="right", style="dim")
-    table.add_column("Runs", justify="right", style="dim")
-    table.add_column("Description")
-    for name in names:
-        try:
-            t = load_test(name)
-            runs = len(list_run_ids(name))
-            table.add_row(name, str(len(t.stages)), str(runs), truncate(t.description, 70))
-        except (ValidationError, FileNotFoundError) as e:
-            table.add_row(name, "?", "?", f"[red]invalid: {e}[/red]")
-    console.print(table)
-
-
-@test_app.command("show")
-def test_show_cmd(
-    name: str = typer.Argument(..., help="Test name (directory under /tests)."),
-) -> None:
-    """Show details for a test, including each stage's prompt."""
-    try:
-        t = load_test(name)
-    except (FileNotFoundError, ValidationError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
-
-    header = Text()
-    header.append(t.title, style="bold cyan")
-    header.append("\n")
-    header.append(t.description, style="white")
-    if t.domain:
-        header.append(f"\n\n")
-        header.append("Domain: ", style="dim")
-        header.append(t.domain)
-    header.append(f"\n")
-    header.append("Runs:   ", style="dim")
-    header.append(str(len(list_run_ids(name))))
-    console.print(Panel(header, title=f"[bold]{t.name}[/bold]", border_style="cyan", padding=(1, 2)))
-
-    for i, stage in enumerate(t.stages, 1):
-        body: list[Any] = []
-        meta = Text()
-        meta.append("Theme: ", style="dim")
-        meta.append(stage.theme)
-        if stage.builds_on:
-            meta.append("    Builds on: ", style="dim")
-            meta.append(stage.builds_on)
-        body.append(meta)
-
-        body.append(Text("\nPrompt", style="bold"))
-        body.append(Panel(stage.prompt.strip(), border_style="dim", padding=(0, 1)))
-
-        console.print(Panel(
-            Group(*body),
-            title=f"[bold cyan]Stage {i}[/bold cyan]  [dim]{stage.id}[/dim]",
-            border_style="cyan",
-            padding=(1, 2),
-        ))
-
-
-# --------------------------------------------------------------------------- #
-# run list / show
-# --------------------------------------------------------------------------- #
-
-
-@run_app.command("list")
-def run_list_cmd(
-    test_name: str = typer.Argument(..., help="Test name."),
-) -> None:
-    """List contributed runs for a test."""
-    if test_name not in list_test_names():
-        err_console.print(f"[red]Test '{test_name}' not found.[/red]")
-        raise typer.Exit(1)
-
-    ids = list_run_ids(test_name)
-    if not ids:
-        console.print(f"[yellow]No runs for '{test_name}' yet.[/yellow]")
-        return
-
-    table = Table(title=f"Runs for {test_name}", box=box.ROUNDED, header_style="bold cyan", title_style="bold", title_justify="left")
-    table.add_column("Run ID", style="bold")
-    table.add_column("Date", style="dim")
-    table.add_column("Contributor")
-    table.add_column("Agent", style="dim")
-    table.add_column("Model")
-    table.add_column("Stages", justify="center")
-
-    for run_id in ids:
-        try:
-            r = load_run(test_name, run_id)
-            agent = r.agent.name + (f" ({r.agent.plan})" if r.agent.plan else "")
-            stages_str = "  ".join(RATING_GLYPH.get(s.rating, "?") for s in r.stages)
-            table.add_row(run_id, r.date.isoformat(), short_url(r.contributor_url), agent, r.model, stages_str)
-        except (ValidationError, FileNotFoundError):
-            table.add_row(run_id, "?", "?", "?", "?", "[red]invalid[/red]")
-
-    console.print(table)
-    legend = Text("Legend: ", style="dim")
-    for rating in RATINGS:
-        legend.append_text(Text.from_markup(RATING_GLYPH[rating]))
-        legend.append(f" {rating}  ", style="dim")
-    console.print(legend)
-
-
-@run_app.command("show")
-def run_show_cmd(
-    test_name: str = typer.Argument(..., help="Test name."),
-    run_id: str = typer.Argument(..., help="Run directory name."),
-) -> None:
-    """Show details for a specific run."""
-    try:
-        r = load_run(test_name, run_id)
-    except (FileNotFoundError, ValidationError) as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
-
-    meta = Table(box=None, show_header=False, padding=(0, 2))
-    meta.add_column(style="dim", no_wrap=True)
-    meta.add_column()
-    meta.add_row("Contributor", r.contributor_url)
-    meta.add_row("Date", r.date.isoformat())
-    agent_str = r.agent.name + (f"  ({r.agent.plan})" if r.agent.plan else "")
-    meta.add_row("Agent", agent_str)
-    meta.add_row("Provider", r.provider)
-    if r.framework:
-        meta.add_row("Framework", r.framework)
-    meta.add_row("Model", r.model)
-    if r.quantization:
-        meta.add_row("Quantization", r.quantization)
-    if r.settings:
-        meta.add_row("Settings", ", ".join(f"{k}={v}" for k, v in r.settings.items()))
-    if r.hardware:
-        hw_items = r.hardware.model_dump(exclude_none=True)
-        meta.add_row("Hardware", ", ".join(f"{k}={v}" for k, v in hw_items.items()))
-    console.print(Panel(meta, title=f"[bold]{run_id}[/bold]  [dim]{test_name}[/dim]", border_style="cyan", padding=(1, 1)))
-
-    stages_table = Table(title="Stages", box=box.ROUNDED, header_style="bold cyan", title_style="bold", title_justify="left")
-    stages_table.add_column("Stage", style="bold")
-    stages_table.add_column("Time", justify="right")
-    stages_table.add_column("In", justify="right", style="dim")
-    stages_table.add_column("Out", justify="right", style="dim")
-    stages_table.add_column("Cost", justify="right")
-    stages_table.add_column("Rating")
-    stages_table.add_column("Notes")
-
-    total_dur, total_tokens_in, total_tokens_out, total_cost = 0, 0, 0, 0.0
-    for s in r.stages:
-        mins, secs = divmod(s.duration_sec, 60)
-        duration = f"{mins}:{secs:02d}"
-        tokens_in = f"{s.tokens_in:,}" if s.tokens_in is not None else "[dim]—[/]"
-        tokens_out = f"{s.tokens_out:,}" if s.tokens_out is not None else "[dim]—[/]"
-        cost = f"${s.cost_usd:.2f}" if s.cost_usd is not None else "[dim]—[/]"
-        rating_cell = f"{RATING_GLYPH[s.rating]} {s.rating}"
-        notes = truncate(s.notes or "", 40)
-        stages_table.add_row(s.id, duration, tokens_in, tokens_out, cost, rating_cell, notes)
-        total_dur += s.duration_sec
-        total_tokens_in += s.tokens_in or 0
-        total_tokens_out += s.tokens_out or 0
-        total_cost += s.cost_usd or 0.0
-
-    # Totals row
-    mins, secs = divmod(total_dur, 60)
-    stages_table.add_section()
-    stages_table.add_row(
-        "[bold]total[/bold]",
-        f"[bold]{mins}:{secs:02d}[/bold]",
-        f"[bold]{total_tokens_in:,}[/bold]" if total_tokens_in else "[dim]—[/]",
-        f"[bold]{total_tokens_out:,}[/bold]" if total_tokens_out else "[dim]—[/]",
-        f"[bold]${total_cost:.2f}[/bold]" if total_cost else "[dim]—[/]",
-        "",
-        "",
-    )
-    console.print(stages_table)
+@app.command("browse")
+def browse_cmd() -> None:
+    """Open the AgentArena TUI to navigate tests, runs, and their details."""
+    AgentArenaApp().run()
 
 
 # --------------------------------------------------------------------------- #
@@ -1235,21 +1380,18 @@ def validate_cmd(
                 errors += _validate_path(run_yaml)
                 errors += _cross_check_run(test_name, run_id, valid_ids)
 
-    if not errors:
-        console.print("[green]✓ All YAML files valid.[/green]")
-        return
-
-    table = Table(title="Validation errors", box=box.ROUNDED, header_style="bold red", title_style="bold red", title_justify="left")
-    table.add_column("File")
-    table.add_column("Error")
+    # Normalize paths for display.
+    pretty: list[tuple[Path, str]] = []
     for p, msg in errors:
         try:
             rel = p.relative_to(REPO_ROOT)
         except ValueError:
             rel = p
-        table.add_row(str(rel), msg)
-    console.print(table)
-    raise typer.Exit(1)
+        pretty.append((rel, msg))
+
+    AgentArenaApp(initial_stack=[ValidateScreen(pretty)]).run()
+    if errors:
+        raise typer.Exit(1)
 
 
 # --------------------------------------------------------------------------- #
