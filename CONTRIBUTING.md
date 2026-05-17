@@ -3,7 +3,29 @@ Please feel free to contribute your own tests and runs of existing tests to this
 
 Contributions should be submitted as a GitHub Pull Request against `main`: Fork the repo, add your run or test on a branch, push it to your fork, and open a PR.
 
-The easiest way to prepare a contribution is the CLI:
+---
+
+## ⚔ The contributor's code ⚔
+
+There is no referee in this arena. No anti-cheat watches your terminal. No tribunal reviews the tape. The leaderboard rests entirely on **your honor**.
+
+Run the stages exactly as written. Report the time, the costs, and the rating you actually got — be honest. *Especially* when your favorite stack stumbles. Your honest data is what helps the community.
+
+If you fake your way to the top, you might fool the board for a week. But the silicon knows. Your PR will be discarded in shame and preserved in the `git log` for history to know.
+
+We trust you. Don't make us regret it. *For honor. For science. For the leaderboard.*
+
+---
+
+# The easiest way to contribute
+
+Fork this repo and clone it:
+
+```sh
+git clone https://github.com/tin-cat/agent-arena.git
+```
+
+Then use the provided CLI _(Needs Python 3.11+)_:
 
 ```sh
 # Browse current tests and runs
@@ -16,7 +38,7 @@ scripts/cli.py run add
 scripts/cli.py test add
 ```
 
-See [Browse with the CLI](README.md#browse-with-the-cli) to setup the CLI.
+Once you're finished, create a push request. Your contributions will be reviewed, and you'll get into the leaderboards as soon as they get accepted.
 
 ---
 
@@ -110,7 +132,11 @@ If your github username were `anthony` and you ran the first two stages of the `
 
 ### `test.yaml` schema
 
+> **`contributor_url` identifies you as the test's author**, the same way it does for runs. The site uses it to credit the test on its detail page, list it under your contributor profile, and group all your contributions together. Use the exact same URL across every run and test you contribute.
+
 ```yaml
+contributor_url: https://github.com/your-username   # see the note above — must match across all your contributions
+
 name: live-message-wall         # matches the test's directory name
 title: A live message wall      # short, human-readable title
 description: |                  # one or two sentences describing what the test simulates
