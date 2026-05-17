@@ -118,7 +118,6 @@ _bootstrap()
 # ----------------------------------------------------------------------------
 
 import argparse
-import html
 import json
 import typing
 from collections import defaultdict
@@ -295,6 +294,20 @@ def handle_from_url(url: str) -> str:
     return netloc.split(".")[0] if netloc else url
 
 
+def avatar_from_url(url: str) -> Optional[str]:
+    """If `url` is a github.com profile, return its avatar PNG URL.
+    GitHub serves `https://github.com/<handle>.png` for any public account."""
+    try:
+        parsed = urlparse(url.strip())
+        host = parsed.netloc.removeprefix("www.").lower()
+        parts = [p for p in parsed.path.split("/") if p]
+        if host == "github.com" and parts:
+            return f"https://github.com/{parts[0]}.png?size=160"
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
 def safe_avg(values: list[float]) -> Optional[float]:
     values = [v for v in values if v is not None]
     return sum(values) / len(values) if values else None
@@ -360,21 +373,44 @@ def build_leaderboard(loaded: dict[str, LoadedTest]) -> list[dict]:
 
 
 def build_scatter(loaded: dict[str, LoadedTest]) -> list[dict]:
-    """One point per run: total cost vs avg rating score."""
-    points: list[dict] = []
+    """One point per model — aggregates every run and stage of that model.
+    X = avg cost per stage, Y = avg rating score, size = total runs."""
+    by_model_stages:    dict[str, list[RunStage]]   = defaultdict(list)
+    by_model_runs:      dict[str, list[LoadedRun]]  = defaultdict(list)
+    by_model_tests:     dict[str, set[str]]         = defaultdict(set)
+    by_model_providers: dict[str, set[str]]         = defaultdict(set)
+    by_model_agents:    dict[str, set[str]]         = defaultdict(set)
+
     for lt in loaded.values():
         for lr in lt.runs:
-            score = rating_score(lr.run.stages)
-            cost = total_cost(lr.run.stages)
-            if score is None or cost is None:
-                continue
-            points.append({
-                "x": cost,
-                "y": score,
-                "label": f"{lr.run.agent.name} / {lr.run.model}",
-                "test": lt.test.title,
-                "run_id": lr.run_id,
-            })
+            model = lr.run.model
+            by_model_stages[model].extend(lr.run.stages)
+            by_model_runs[model].append(lr)
+            by_model_tests[model].add(lt.test.name)
+            by_model_providers[model].add(lr.run.provider)
+            by_model_agents[model].add(lr.run.agent.name)
+
+    points: list[dict] = []
+    for model, stages in by_model_stages.items():
+        if not stages:
+            continue
+        score = rating_score(stages)
+        costs = [s.cost_usd for s in stages if s.cost_usd is not None]
+        avg_cost = sum(costs) / len(costs) if costs else None
+        if score is None or avg_cost is None:
+            continue
+        points.append({
+            "x":           avg_cost,
+            "y":           score,
+            "label":       model,
+            "model":       model,
+            "providers":   sorted(by_model_providers[model]),
+            "agents":      sorted(by_model_agents[model]),
+            "run_count":   len(by_model_runs[model]),
+            "stage_count": len(stages),
+            "test_count":  len(by_model_tests[model]),
+        })
+    points.sort(key=lambda p: p["run_count"], reverse=True)
     return points
 
 
@@ -404,31 +440,49 @@ def build_theme_stats(loaded: dict[str, LoadedTest]) -> list[dict]:
     return out
 
 
+def _run_summary(lr: LoadedRun, lt: LoadedTest) -> dict:
+    score = rating_score(lr.run.stages)
+    cost = total_cost(lr.run.stages)
+    return {
+        "run_id": lr.run_id,
+        "test_name": lt.test.name,
+        "test_title": lt.test.title,
+        "agent": lr.run.agent.name,
+        "agent_plan": lr.run.agent.plan,
+        "provider": lr.run.provider,
+        "framework": lr.run.framework,
+        "model": lr.run.model,
+        "quantization": lr.run.quantization,
+        "contributor_url": lr.run.contributor_url,
+        "contributor_handle": handle_from_url(lr.run.contributor_url),
+        "date": lr.run.date.isoformat(),
+        "stages_run": len(lr.run.stages),
+        "stages_total": len(lt.test.stages),
+        "avg_rating_score": score,
+        "total_cost_usd": cost,
+        "total_duration_sec": total_duration(lr.run.stages),
+        "stages": [
+            {
+                "id": s.id,
+                "rating": s.rating,
+                "duration_sec": s.duration_sec,
+                "tokens_in": s.tokens_in,
+                "tokens_out": s.tokens_out,
+                "cost_usd": s.cost_usd,
+                "notes": s.notes,
+            }
+            for s in lr.run.stages
+        ],
+        "hardware": lr.run.hardware.model_dump() if lr.run.hardware else None,
+        "settings": lr.run.settings,
+    }
+
+
 def build_per_test(loaded: dict[str, LoadedTest]) -> list[dict]:
-    """One card per test, with its top runs."""
+    """One card per test, with its full stage definitions and ranked runs."""
     out = []
     for lt in sorted(loaded.values(), key=lambda x: x.test.name):
-        run_summaries = []
-        for lr in lt.runs:
-            score = rating_score(lr.run.stages)
-            cost = total_cost(lr.run.stages)
-            run_summaries.append({
-                "run_id": lr.run_id,
-                "agent": lr.run.agent.name,
-                "provider": lr.run.provider,
-                "model": lr.run.model,
-                "contributor_url": lr.run.contributor_url,
-                "contributor_handle": handle_from_url(lr.run.contributor_url),
-                "date": lr.run.date.isoformat(),
-                "stages_run": len(lr.run.stages),
-                "stages_total": len(lt.test.stages),
-                "avg_rating_score": score,
-                "total_cost_usd": cost,
-                "total_duration_sec": total_duration(lr.run.stages),
-                "stage_ratings": [
-                    {"id": s.id, "rating": s.rating} for s in lr.run.stages
-                ],
-            })
+        run_summaries = [_run_summary(lr, lt) for lr in lt.runs]
         run_summaries.sort(key=lambda r: (r["avg_rating_score"] or 0), reverse=True)
         out.append({
             "name": lt.test.name,
@@ -436,51 +490,111 @@ def build_per_test(loaded: dict[str, LoadedTest]) -> list[dict]:
             "description": lt.test.description.strip(),
             "domain": lt.test.domain,
             "stages_total": len(lt.test.stages),
+            "test_stages": [
+                {"id": s.id, "theme": s.theme, "prompt": s.prompt, "builds_on": s.builds_on}
+                for s in lt.test.stages
+            ],
             "run_count": len(lt.runs),
             "runs": run_summaries,
         })
     return out
 
 
-def build_contributors(loaded: dict[str, LoadedTest]) -> dict[str, list[dict]]:
-    """Most active (by total runs) + most recent contributors."""
-    by_url: dict[str, list[LoadedRun]] = defaultdict(list)
+def build_all_runs(loaded: dict[str, LoadedTest]) -> list[dict]:
+    """Flat list of every run across every test — for the Runs tab."""
+    out: list[dict] = []
     for lt in loaded.values():
         for lr in lt.runs:
-            by_url[lr.run.contributor_url].append(lr)
+            out.append(_run_summary(lr, lt))
+    out.sort(key=lambda r: r["date"], reverse=True)
+    return out
 
-    most_active: list[dict] = []
-    for url, runs in by_url.items():
-        all_stages = [s for lr in runs for s in lr.run.stages]
+
+def build_activity(loaded: dict[str, LoadedTest]) -> list[dict]:
+    """Run count per date — drives the contributor activity timeline."""
+    by_date: dict[str, int] = defaultdict(int)
+    for lt in loaded.values():
+        for lr in lt.runs:
+            by_date[lr.run.date.isoformat()] += 1
+    return [{"date": d, "count": c} for d, c in sorted(by_date.items())]
+
+
+def build_contributors(loaded: dict[str, LoadedTest]) -> dict[str, list[dict]]:
+    """Per-contributor profiles (ranked) + latest contributions feed."""
+    # Pair every run with its containing test so we can build per-contributor run lists.
+    by_url: dict[str, list[tuple[LoadedTest, LoadedRun]]] = defaultdict(list)
+    for lt in loaded.values():
+        for lr in lt.runs:
+            by_url[lr.run.contributor_url].append((lt, lr))
+
+    profiles: list[dict] = []
+    for url, items in by_url.items():
+        all_stages = [s for _, lr in items for s in lr.run.stages]
         score = rating_score(all_stages) if all_stages else None
-        latest = max((lr.run.date for lr in runs), default=None)
-        most_active.append({
-            "url": url,
-            "handle": handle_from_url(url),
-            "run_count": len(runs),
-            "test_count": len({lr.test_name for lr in runs}),
-            "stage_count": len(all_stages),
-            "avg_rating_score": score,
-            "latest_date": latest.isoformat() if latest else None,
-        })
-    most_active.sort(key=lambda r: (r["run_count"], r["stage_count"]), reverse=True)
+        costs = [s.cost_usd for s in all_stages if s.cost_usd is not None]
+        cost_total = sum(costs) if costs else None
+        dur_total  = sum(s.duration_sec for s in all_stages)
+        dates = [lr.run.date for _, lr in items]
+        latest = max(dates, default=None)
+        first  = min(dates, default=None)
 
-    all_runs: list[LoadedRun] = [lr for lt in loaded.values() for lr in lt.runs]
-    all_runs.sort(key=lambda lr: lr.run.date, reverse=True)
-    recent = []
-    for lr in all_runs[:10]:
-        recent.append({
-            "url": lr.run.contributor_url,
-            "handle": handle_from_url(lr.run.contributor_url),
-            "date": lr.run.date.isoformat(),
-            "test_name": lr.test_name,
-            "run_id": lr.run_id,
-            "agent": lr.run.agent.name,
-            "model": lr.run.model,
-            "provider": lr.run.provider,
+        # Most-used provider/model combo — flavor metadata for the hero.
+        combos: dict[str, int] = defaultdict(int)
+        for _, lr in items:
+            combos[f"{lr.run.provider} / {lr.run.model}"] += 1
+        top_combo = max(combos.items(), key=lambda x: x[1])[0] if combos else None
+
+        runs = [_run_summary(lr, lt) for lt, lr in items]
+        runs.sort(key=lambda r: r["date"], reverse=True)
+
+        profiles.append({
+            "url":                url,
+            "handle":             handle_from_url(url),
+            "avatar_url":         avatar_from_url(url),
+            "run_count":          len(items),
+            "test_count":         len({lt.test.name for lt, _ in items}),
+            "stage_count":        len(all_stages),
+            "avg_rating_score":   score,
+            "total_cost_usd":     cost_total,
+            "total_duration_sec": dur_total,
+            "first_date":         first.isoformat() if first else None,
+            "latest_date":        latest.isoformat() if latest else None,
+            "top_combo":          top_combo,
+            "runs":               runs,
         })
 
-    return {"most_active": most_active, "recent": recent}
+    # Rank by activity, then quality, then recency as tiebreakers.
+    profiles.sort(
+        key=lambda p: (
+            p["run_count"],
+            p["stage_count"],
+            p["avg_rating_score"] or 0,
+            p["latest_date"] or "",
+        ),
+        reverse=True,
+    )
+    for i, p in enumerate(profiles):
+        p["rank"] = i + 1
+
+    all_runs: list[tuple[LoadedTest, LoadedRun]] = [
+        (lt, lr) for lt in loaded.values() for lr in lt.runs
+    ]
+    all_runs.sort(key=lambda x: x[1].run.date, reverse=True)
+    recent = [
+        {
+            "url":       lr.run.contributor_url,
+            "handle":    handle_from_url(lr.run.contributor_url),
+            "date":      lr.run.date.isoformat(),
+            "test_name": lt.test.name,
+            "run_id":    lr.run_id,
+            "agent":     lr.run.agent.name,
+            "model":     lr.run.model,
+            "provider":  lr.run.provider,
+        }
+        for lt, lr in all_runs[:10]
+    ]
+
+    return {"profiles": profiles, "recent": recent}
 
 
 def build_summary(loaded: dict[str, LoadedTest]) -> dict:
@@ -543,17 +657,31 @@ def fmt_duration(seconds: Optional[float]) -> str:
 
 def render(out_dir: Path, github_url: str) -> None:
     loaded = load_all()
+    build_date = date.today().isoformat()
 
     summary      = build_summary(loaded)
     leaderboard  = build_leaderboard(loaded)
     scatter      = build_scatter(loaded)
     theme_stats  = build_theme_stats(loaded)
     per_test     = build_per_test(loaded)
+    all_runs     = build_all_runs(loaded)
     contributors = build_contributors(loaded)
+    activity     = build_activity(loaded)
 
     data_for_js = {
-        "scatter": scatter,
-        "theme_stats": theme_stats,
+        "build_date":   build_date,
+        "github_url":   github_url,
+        "tagline":      "Community contributed benchmarks of agentic AI coding setups",
+        "summary":      summary,
+        "leaderboard":  leaderboard,
+        "scatter":      scatter,
+        "theme_stats":  theme_stats,
+        "per_test":     per_test,
+        "all_runs":     all_runs,
+        "contributors": contributors,
+        "activity":     activity,
+        "rating_score": RATING_SCORE,
+        "rating_color": RATING_COLOR,
     }
 
     env = Environment(
@@ -561,35 +689,22 @@ def render(out_dir: Path, github_url: str) -> None:
         undefined=StrictUndefined,
         autoescape=select_autoescape(enabled_extensions=("html",)),
     )
-    env.filters["round"] = round  # ensure Jinja uses Python round
     tmpl = env.get_template("index.html")
     html_out = tmpl.render(
         project_name="AgentArena",
-        tagline="A community benchmark for AI coding agent performance",
+        tagline="Community contributed benchmarks of agentic AI coding setups",
         github_url=github_url,
-        build_date=date.today().isoformat(),
+        build_date=build_date,
         summary=summary,
-        leaderboard=leaderboard,
-        scatter=scatter,
-        theme_stats=theme_stats,
-        per_test=per_test,
-        contributors=contributors,
-        data_json=json.dumps(data_for_js, separators=(",", ":")),
-        fmt_duration=fmt_duration,
-        rating_color=lambda r: RATING_COLOR.get(r, "#5d6878"),
+        data_json=json.dumps(data_for_js, separators=(",", ":"), default=str),
     )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "index.html").write_text(html_out, encoding="utf-8")
     (out_dir / "stats.json").write_text(json.dumps({
-        "generated_at": date.today().isoformat(),
-        "summary": summary,
-        "leaderboard": leaderboard,
-        "scatter": scatter,
-        "theme_stats": theme_stats,
-        "per_test": per_test,
-        "contributors": contributors,
-    }, indent=2), encoding="utf-8")
+        "generated_at": build_date,
+        **{k: v for k, v in data_for_js.items() if k not in ("rating_score", "rating_color")},
+    }, indent=2, default=str), encoding="utf-8")
     (out_dir / ".nojekyll").write_text("", encoding="utf-8")  # GitHub Pages: skip Jekyll
 
     print(f"✓ Wrote {out_dir / 'index.html'}")

@@ -61,3 +61,8 @@ Run `scripts/cli.py --help` for the full command list. On Windows, invoke with `
 
 ## Contribute
 Please feel free to contribute your tests to this repository. You can either contribute entire new tests, or your runs of existing tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
+---
+
+## About
+Reach me at [@lorenzoherrera](https://twitter.com/lorenzoherrera)
