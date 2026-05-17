@@ -843,36 +843,6 @@ class RunScreen(Screen):
         content.mount(stages_table)
 
 
-class ValidateScreen(Screen):
-    """Validation results — one row per error."""
-
-    BINDINGS = [
-        Binding("escape,q", "app.quit", "Quit"),
-    ]
-
-    def __init__(self, errors: list[tuple[Path, str]]) -> None:
-        super().__init__()
-        self.errors = errors
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        yield Label("Validation", classes="section-title")
-        yield DataTable(id="errors-table", zebra_stripes=True)
-        yield Footer()
-
-    def on_mount(self) -> None:
-        self.app.sub_title = f"{len(self.errors)} error(s)" if self.errors else "✓ all valid"
-        table = self.query_one("#errors-table", DataTable)
-        table.add_columns("File", "Error")
-        for path, message in self.errors:
-            table.add_row(str(path), message)
-        table.cursor_type = "row"
-        if self.errors:
-            table.focus()
-        else:
-            self.notify("All YAML files valid.", severity="information")
-
-
 class AgentArenaApp(_TextualApp):
     """Textual app for browsing AgentArena tests and runs."""
 
@@ -1866,18 +1836,18 @@ def validate_cmd(
                 errors += _validate_path(run_yaml)
                 errors += _cross_check_run(test_name, run_id, valid_ids)
 
-    # Normalize paths for display.
-    pretty: list[tuple[Path, str]] = []
+    if not errors:
+        console.print("[green]✓ All YAML files valid.[/green]")
+        return
+
+    console.print(f"[red]Found {len(errors)} validation error(s):[/red]\n")
     for p, msg in errors:
         try:
             rel = p.relative_to(REPO_ROOT)
         except ValueError:
             rel = p
-        pretty.append((rel, msg))
-
-    AgentArenaApp(initial_stack=[ValidateScreen(pretty)]).run()
-    if errors:
-        raise typer.Exit(1)
+        console.print(f"  [bold]{rel}[/bold]: {msg}")
+    raise typer.Exit(1)
 
 
 # --------------------------------------------------------------------------- #
