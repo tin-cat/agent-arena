@@ -1,10 +1,11 @@
 # AgentArena
-*See how coding agents really perform across models, providers, and hardware.*  
-A community benchmark — contribute your runs and tests.
+**A community benchmark for coding agent performance**
 
 This repository gives you a clearer picture of how different tools perform on real coding tasks. Useful if you're deciding, for example, whether a self-hosted inference setup or a cloud-based one is the better fit for your workflow.
 
 Each test simulates a real coding task, with results divided into multiple stages that progress from a first unattended run to the incremental implementation of complex refinements. Users [contribute](CONTRIBUTING.md) their runs across different combinations of models, providers, and settings, and also new tests.
+
+---
 
 ## Tests structure
 
@@ -40,10 +41,7 @@ You only need Python 3.11+. The script bootstraps its own dependencies into `scr
 
 ```sh
 # Browse
-scripts/cli.py test list                       # list all tests
-scripts/cli.py test show <test>                # view a test, including its prompts
-scripts/cli.py run list <test>                 # list runs for a test
-scripts/cli.py run show <test> <run-id>        # view a run's metadata and metrics
+scripts/cli.py browse                          # full TUI for tests, runs, and their details
 
 # Add (interactive)
 scripts/cli.py run add                         # record a new run
@@ -54,6 +52,23 @@ scripts/cli.py validate                        # check all yaml files against th
 ```
 
 Run `scripts/cli.py --help` for the full command list. On Windows, invoke with `python scripts/cli.py …` since the shebang isn't honored.
+
+---
+
+## Stats site
+
+A static stats page is rebuilt and republished on every push to `main` — leaderboard by agent/provider/model, cost-vs-quality scatter, success rates by stage theme, per-test breakdown, and contributor activity. The build is driven by `scripts/build_site.py`, deployed via [`.github/workflows/build-site.yml`](.github/workflows/build-site.yml) to GitHub Pages.
+
+To preview it locally:
+
+```sh
+scripts/build_site.py            # writes site/index.html and site/stats.json
+open site/index.html             # or just open the file in your browser
+```
+
+The `site/` directory is gitignored — only the source data and the build script are committed.
+
+---
 
 ## Contribute
 Please feel free to contribute your tests to this repository. You can either contribute entire new tests, or your runs of existing tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.

@@ -1,2 +1,5 @@
-# Self-bootstrapped venv used by scripts/cli.py
+# Self-bootstrapped venv used by scripts/cli.py and scripts/build_site.py
 scripts/.venv/
+
+# Generated stats site (rebuilt by GitHub Actions on every push to main)
+site/

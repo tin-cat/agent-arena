@@ -4,9 +4,9 @@
 # dependencies = [
 #     "typer>=0.12",
 #     "rich>=13.7",
-#     "questionary>=2.0",
 #     "pydantic>=2.6",
 #     "ruamel.yaml>=0.18",
+#     "textual>=0.50",
 # ]
 # ///
 """CLI for managing AgentArena tests and their runs.
@@ -34,7 +34,6 @@ from pathlib import Path
 _DEPS = (
     "typer>=0.12",
     "rich>=13.7",
-    "questionary>=2.0",
     "pydantic>=2.6",
     "ruamel.yaml>=0.18",
     "textual>=0.50",
@@ -45,7 +44,6 @@ _VENV_PY = _VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/py
 
 def _have_deps() -> bool:
     try:
-        import questionary  # noqa: F401
         import pydantic     # noqa: F401
         import rich         # noqa: F401
         import ruamel.yaml  # noqa: F401
@@ -185,7 +183,6 @@ from io import StringIO
 from typing import Any, Literal, Optional
 
 import click
-import questionary
 import typer
 import typer.core
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
@@ -196,12 +193,13 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 from ruamel.yaml import YAML
+from dataclasses import dataclass, field
 from textual import on as _on_event
 from textual.app import App as _TextualApp, ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll
-from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Label, Static
+from textual.containers import Container, Horizontal, VerticalScroll
+from textual.screen import ModalScreen, Screen
+from textual.widgets import Button, DataTable, Footer, Header, Input, Label, Select, Static, TextArea
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 # --------------------------------------------------------------------------- #
@@ -509,43 +507,11 @@ def truncate(text: str, width: int) -> str:
     return text[: width - 1] + "…"
 
 
-def require(value: Optional[str]) -> str:
-    """Exit gracefully if the user aborted a questionary prompt (Ctrl-C / Esc)."""
-    if value is None:
-        err_console.print("[yellow]Aborted.[/yellow]")
-        raise typer.Exit(130)
-    return value
-
-
-def read_pasted_text(label: str) -> str:
-    """Read multi-line text from stdin, paste-friendly.
-
-    Terminates on Ctrl-D (macOS / Linux) or Ctrl-Z + Enter (Windows),
-    or on a line containing only `END` (case-insensitive).
-    """
-    console.print(f"\n[bold]{label}[/bold]")
-    console.print(
-        "[dim]Paste the text below. When done, finish with [bold]Ctrl-D[/bold] "
-        "([bold]Ctrl-Z[/bold] then [bold]Enter[/bold] on Windows), or type "
-        "[bold]END[/bold] on its own line and press [bold]Enter[/bold].[/dim]"
-    )
-    lines: list[str] = []
-    while True:
-        try:
-            line = input()
-        except EOFError:
-            break
-        if line.strip().upper() == "END":
-            break
-        lines.append(line)
-    return "\n".join(lines).strip()
-
-
 # --------------------------------------------------------------------------- #
-# Textual UI — the `browse` command launches AgentArenaApp at TestsScreen.
-# Esc walks up the stack (RunScreen / TestDetailsScreen → TestScreen →
-# TestsScreen → quit). Q quits from anywhere. The questionary-based `*_add`
-# forms are intentionally separate — they collect input, not display data.
+# Textual UI — `browse` opens TestsScreen; `test add` / `run add` open form
+# screens. Esc walks up the stack (Run / TestDetails → TestScreen → Tests →
+# quit). Q quits from anywhere. Stage editing happens in modal screens; a
+# preview modal shows the YAML before writing to disk.
 # --------------------------------------------------------------------------- #
 
 
@@ -585,6 +551,69 @@ Screen {
 
 DataTable {
     margin: 0 1;
+}
+
+/* form styles */
+.field-label {
+    color: cyan;
+    margin: 1 1 0 1;
+}
+
+.help-text {
+    color: $foreground 60%;
+    margin: 0 1 1 1;
+}
+
+.button-row {
+    height: auto;
+    margin: 1 1 0 1;
+}
+
+.button-row > Button {
+    margin: 0 1 0 0;
+}
+
+Input, TextArea, Select {
+    margin: 0 1 1 1;
+}
+
+#description, #settings-area {
+    height: 6;
+}
+
+#stage-prompt-area {
+    height: 14;
+}
+
+#notes-area {
+    height: 4;
+}
+
+#self-hosted-section {
+    height: auto;
+}
+
+#self-hosted-section.hidden {
+    display: none;
+}
+
+.preview-yaml {
+    border: round cyan;
+    padding: 0 1;
+    margin: 0 1 1 1;
+    height: 1fr;
+}
+
+.modal-container {
+    width: 90%;
+    height: 90%;
+    border: thick cyan;
+    background: $surface;
+    padding: 0 1;
+}
+
+TestStageEditScreen, RunStageEditScreen, _TestPreviewScreen, _RunPreviewScreen {
+    align: center middle;
 }
 """
 
@@ -861,6 +890,765 @@ class AgentArenaApp(_TextualApp):
 
 
 # --------------------------------------------------------------------------- #
+# Textual forms — test add / run add. Both flows reuse AgentArenaApp with a
+# dedicated form screen as the initial stack. Stage editing happens in modal
+# screens; a final preview modal shows the YAML before writing to disk.
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class _StageDraft:
+    """Test-stage data captured while filling out the test-add form."""
+    idx: int
+    id: str = ""
+    theme: str = "bootstrap"
+    builds_on: Optional[str] = None
+    prompt: str = ""
+
+
+@dataclass
+class _RunStageDraft:
+    """Per-stage metrics captured while filling out the run-add form."""
+    stage_id: str
+    recorded: bool = False
+    duration_sec: Optional[int] = None
+    tokens_in: Optional[int] = None
+    tokens_out: Optional[int] = None
+    cost_usd: Optional[float] = None
+    rating: str = "good"
+    notes: Optional[str] = None
+
+
+class TestStageEditScreen(ModalScreen[Optional[_StageDraft]]):
+    """Modal: add or edit a single test stage."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+s", "save", "Save stage"),
+    ]
+
+    def __init__(self, idx: int, *, previous_stage_ids: list[str], initial: Optional[_StageDraft] = None) -> None:
+        super().__init__()
+        self.idx = idx
+        self.previous_stage_ids = previous_stage_ids
+        self.initial = initial
+
+    def compose(self) -> ComposeResult:
+        with Container(classes="modal-container"):
+            yield Header()
+            with VerticalScroll():
+                yield Label(f"Stage {self.idx}", classes="section-title")
+                prefix = f"stage-{self.idx}-"
+                yield Label(f"ID (must start with '{prefix}'):", classes="field-label")
+                yield Input(
+                    value=self.initial.id if self.initial else prefix,
+                    placeholder=prefix,
+                    id="stage-id",
+                )
+                yield Label("Theme:", classes="field-label")
+                yield Select(
+                    options=[(THEME_LABELS[t], t) for t in THEMES],
+                    value=self.initial.theme if self.initial else THEMES[0],
+                    id="stage-theme",
+                    allow_blank=False,
+                )
+                if self.previous_stage_ids:
+                    yield Label("Builds on (optional):", classes="field-label")
+                    yield Select(
+                        options=[(p, p) for p in self.previous_stage_ids],
+                        value=self.initial.builds_on if (self.initial and self.initial.builds_on) else Select.BLANK,
+                        id="stage-builds-on",
+                    )
+                yield Label("Prompt (fed to the LLM verbatim):", classes="field-label")
+                yield TextArea(
+                    self.initial.prompt if self.initial else "",
+                    id="stage-prompt-area",
+                )
+                with Horizontal(classes="button-row"):
+                    yield Button("Cancel", id="cancel")
+                    yield Button("Save stage", id="save", variant="success")
+            yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = f"stage {self.idx}"
+        self.query_one("#stage-id", Input).focus()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_save(self) -> None:
+        self._save()
+
+    @_on_event(Button.Pressed, "#cancel")
+    def _on_cancel(self) -> None:
+        self.dismiss(None)
+
+    @_on_event(Button.Pressed, "#save")
+    def _on_save(self) -> None:
+        self._save()
+
+    def _save(self) -> None:
+        stage_id = self.query_one("#stage-id", Input).value.strip()
+        prefix = f"stage-{self.idx}-"
+        if not stage_id.startswith(prefix) or not is_kebab_case(stage_id):
+            self.notify(f"ID must be kebab-case starting with '{prefix}'.", severity="error", title="Invalid stage ID")
+            return
+        theme = str(self.query_one("#stage-theme", Select).value)
+        builds_on: Optional[str] = None
+        if self.previous_stage_ids:
+            v = self.query_one("#stage-builds-on", Select).value
+            if v not in (Select.BLANK, None):
+                builds_on = str(v)
+        prompt = self.query_one("#stage-prompt-area", TextArea).text.strip()
+        if not prompt:
+            self.notify("Prompt cannot be empty.", severity="error")
+            return
+        self.dismiss(_StageDraft(idx=self.idx, id=stage_id, theme=theme, builds_on=builds_on, prompt=prompt))
+
+
+class _TestPreviewScreen(ModalScreen[bool]):
+    """Modal: preview the test.yaml that will be written; True = save, False = back."""
+
+    BINDINGS = [
+        Binding("escape", "back", "Back"),
+        Binding("ctrl+s", "save", "Save"),
+    ]
+
+    def __init__(self, test_yaml_text: str, target_path: Path) -> None:
+        super().__init__()
+        self.test_yaml_text = test_yaml_text
+        self.target_path = target_path
+
+    def compose(self) -> ComposeResult:
+        with Container(classes="modal-container"):
+            yield Header()
+            yield Label("Preview", classes="section-title")
+            try:
+                rel = self.target_path.relative_to(REPO_ROOT)
+            except ValueError:
+                rel = self.target_path
+            yield Label(f"Will write to: {rel}", classes="help-text")
+            with VerticalScroll(classes="preview-yaml"):
+                yield Static(self.test_yaml_text)
+            with Horizontal(classes="button-row"):
+                yield Button("Back to edit", id="back")
+                yield Button("Save test.yaml", id="save", variant="success")
+            yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = "preview"
+
+    def action_back(self) -> None:
+        self.dismiss(False)
+
+    def action_save(self) -> None:
+        self.dismiss(True)
+
+    @_on_event(Button.Pressed, "#back")
+    def _on_back(self) -> None:
+        self.dismiss(False)
+
+    @_on_event(Button.Pressed, "#save")
+    def _on_save(self) -> None:
+        self.dismiss(True)
+
+
+class TestAddScreen(Screen):
+    """Form: create a new test.yaml."""
+
+    BINDINGS = [
+        Binding("escape", "app.quit", "Cancel"),
+        Binding("ctrl+s", "save", "Preview & save"),
+    ]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stages: list[_StageDraft] = []
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with VerticalScroll(id="content"):
+            yield Label("Name (test directory, kebab-case):", classes="field-label")
+            yield Input(placeholder="e.g. live-message-wall", id="name")
+            yield Label("Short human-readable title:", classes="field-label")
+            yield Input(placeholder="A live message wall", id="title")
+            yield Label("Description (one or two sentences):", classes="field-label")
+            yield TextArea("", id="description")
+            yield Label("Domain (optional, pick the closest match):", classes="field-label")
+            yield Select(
+                options=[(DOMAIN_LABELS[d], d) for d in DOMAINS],
+                allow_blank=True,
+                id="domain",
+                prompt="(skip)",
+            )
+            yield Label("Stages", classes="section-title")
+            yield Label("Add stages in order; later stages may build on earlier ones.", classes="help-text")
+            yield DataTable(id="stages-table", show_cursor=False, zebra_stripes=True)
+            with Horizontal(classes="button-row"):
+                yield Button("+ Add stage", id="add-stage", variant="primary")
+                yield Button("- Remove last", id="remove-stage")
+            with Horizontal(classes="button-row"):
+                yield Button("Cancel", id="cancel")
+                yield Button("Preview & save", id="save", variant="success")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.title = "AgentArena"
+        self.app.sub_title = "new test"
+        table = self.query_one("#stages-table", DataTable)
+        table.add_columns("#", "ID", "Theme", "Builds on")
+        self.query_one("#name", Input).focus()
+
+    def _refresh_stages(self) -> None:
+        table = self.query_one("#stages-table", DataTable)
+        table.clear()
+        for s in self.stages:
+            table.add_row(str(s.idx), s.id, s.theme, s.builds_on or "-")
+
+    @_on_event(Button.Pressed, "#add-stage")
+    def _add_stage(self) -> None:
+        next_idx = len(self.stages) + 1
+        prev_ids = [s.id for s in self.stages]
+        self.app.push_screen(
+            TestStageEditScreen(next_idx, previous_stage_ids=prev_ids),
+            self._stage_returned,
+        )
+
+    def _stage_returned(self, draft: Optional[_StageDraft]) -> None:
+        if draft is None:
+            return
+        self.stages.append(draft)
+        self._refresh_stages()
+
+    @_on_event(Button.Pressed, "#remove-stage")
+    def _remove_stage(self) -> None:
+        if self.stages:
+            self.stages.pop()
+            self._refresh_stages()
+
+    @_on_event(Button.Pressed, "#cancel")
+    def _cancel(self) -> None:
+        self.app.exit()
+
+    @_on_event(Button.Pressed, "#save")
+    def _save_button(self) -> None:
+        self.action_save()
+
+    def action_save(self) -> None:
+        name = self.query_one("#name", Input).value.strip()
+        title = self.query_one("#title", Input).value.strip()
+        description = self.query_one("#description", TextArea).text.strip()
+        domain_widget = self.query_one("#domain", Select)
+        dv = domain_widget.value
+        domain = str(dv) if dv not in (Select.BLANK, None) else None
+
+        errors: list[str] = []
+        if not name or not is_kebab_case(name):
+            errors.append("Name must be kebab-case (lowercase letters/digits/dashes).")
+        target_dir = TESTS_DIR / name if name else None
+        if target_dir and target_dir.exists():
+            errors.append(f"Directory already exists: tests/{name}")
+        if not title:
+            errors.append("Title is required.")
+        if not description:
+            errors.append("Description is required.")
+        if not self.stages:
+            errors.append("Add at least one stage.")
+        if errors:
+            self.notify("\n".join(errors), severity="error", title="Cannot save")
+            return
+
+        try:
+            test = Test(
+                name=name,
+                title=title,
+                description=description,
+                domain=domain,
+                stages=[TestStage(id=s.id, theme=s.theme, prompt=s.prompt, builds_on=s.builds_on) for s in self.stages],
+            )
+        except ValidationError as e:
+            self.notify(str(e), severity="error", title="Schema validation failed")
+            return
+
+        buf = StringIO()
+        yaml.dump(test_to_yaml(test), buf)
+        target_path = target_dir / "test.yaml"  # type: ignore[union-attr]
+        self.app.push_screen(
+            _TestPreviewScreen(buf.getvalue(), target_path),
+            lambda confirmed: self._after_preview(confirmed, test, target_dir),
+        )
+
+    def _after_preview(self, confirmed: bool, test: "Test", target_dir: Path) -> None:
+        if not confirmed:
+            return
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "results").mkdir(exist_ok=True)
+        write_yaml(target_dir / "test.yaml", test_to_yaml(test))
+        rel = (target_dir / "test.yaml").relative_to(REPO_ROOT)
+        self.app.exit(result=str(rel))
+
+
+class RunStageEditScreen(ModalScreen[Optional[_RunStageDraft]]):
+    """Modal: record metrics for one stage of a run."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+s", "save", "Save"),
+    ]
+
+    def __init__(self, stage_id: str, *, initial: Optional[_RunStageDraft] = None) -> None:
+        super().__init__()
+        self.stage_id = stage_id
+        self.initial = initial
+
+    def compose(self) -> ComposeResult:
+        with Container(classes="modal-container"):
+            yield Header()
+            with VerticalScroll():
+                yield Label(f"Stage: {self.stage_id}", classes="section-title")
+                yield Label("Duration (mm:ss or seconds):", classes="field-label")
+                yield Input(
+                    value=str(self.initial.duration_sec) if (self.initial and self.initial.duration_sec) else "",
+                    placeholder="e.g. 7:27 or 447",
+                    id="duration",
+                )
+                yield Label("Input tokens (optional, e.g. 12300 or 12.3k):", classes="field-label")
+                yield Input(
+                    value=str(self.initial.tokens_in) if (self.initial and self.initial.tokens_in is not None) else "",
+                    placeholder="empty to skip",
+                    id="tokens-in",
+                )
+                yield Label("Output tokens (optional):", classes="field-label")
+                yield Input(
+                    value=str(self.initial.tokens_out) if (self.initial and self.initial.tokens_out is not None) else "",
+                    placeholder="empty to skip",
+                    id="tokens-out",
+                )
+                yield Label("Cost in USD (optional, e.g. 0.63):", classes="field-label")
+                yield Input(
+                    value=str(self.initial.cost_usd) if (self.initial and self.initial.cost_usd is not None) else "",
+                    placeholder="empty to skip",
+                    id="cost",
+                )
+                yield Label("Rating:", classes="field-label")
+                yield Select(
+                    options=[(f"{r} - {RATING_BLURB[r]}", r) for r in RATINGS],
+                    value=self.initial.rating if self.initial else "good",
+                    id="rating",
+                    allow_blank=False,
+                )
+                yield Label("Notes (optional):", classes="field-label")
+                yield TextArea(
+                    self.initial.notes if (self.initial and self.initial.notes) else "",
+                    id="notes-area",
+                )
+                with Horizontal(classes="button-row"):
+                    yield Button("Cancel", id="cancel")
+                    yield Button("Save metrics", id="save", variant="success")
+            yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = f"stage: {self.stage_id}"
+        self.query_one("#duration", Input).focus()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_save(self) -> None:
+        self._save()
+
+    @_on_event(Button.Pressed, "#cancel")
+    def _on_cancel(self) -> None:
+        self.dismiss(None)
+
+    @_on_event(Button.Pressed, "#save")
+    def _on_save(self) -> None:
+        self._save()
+
+    def _save(self) -> None:
+        duration_raw = self.query_one("#duration", Input).value.strip()
+        if not duration_raw:
+            self.notify("Duration is required.", severity="error")
+            return
+        duration_sec = parse_duration(duration_raw)
+        if duration_sec is None:
+            self.notify("Duration must be mm:ss or a plain number of seconds.", severity="error")
+            return
+
+        ti_raw = self.query_one("#tokens-in", Input).value.strip()
+        tokens_in = parse_token_count(ti_raw) if ti_raw else None
+        if ti_raw and tokens_in is None:
+            self.notify("Invalid input tokens (use a number, optional k/M suffix).", severity="error")
+            return
+
+        to_raw = self.query_one("#tokens-out", Input).value.strip()
+        tokens_out = parse_token_count(to_raw) if to_raw else None
+        if to_raw and tokens_out is None:
+            self.notify("Invalid output tokens.", severity="error")
+            return
+
+        cost_raw = self.query_one("#cost", Input).value.strip()
+        cost_usd = parse_cost(cost_raw) if cost_raw else None
+        if cost_raw and cost_usd is None:
+            self.notify("Invalid cost (use a number, optionally with $).", severity="error")
+            return
+
+        rating = str(self.query_one("#rating", Select).value)
+        notes = self.query_one("#notes-area", TextArea).text.strip() or None
+
+        self.dismiss(_RunStageDraft(
+            stage_id=self.stage_id,
+            recorded=True,
+            duration_sec=duration_sec,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=cost_usd,
+            rating=rating,
+            notes=notes,
+        ))
+
+
+class _RunPreviewScreen(ModalScreen[Optional[str]]):
+    """Modal: preview run.yaml and pick the run-id slug. Returns the slug on save, None on back."""
+
+    BINDINGS = [
+        Binding("escape", "back", "Back"),
+        Binding("ctrl+s", "save", "Save"),
+    ]
+
+    def __init__(self, run_yaml_text: str, test_name: str, suggested_id: str) -> None:
+        super().__init__()
+        self.run_yaml_text = run_yaml_text
+        self.test_name = test_name
+        self.suggested_id = suggested_id
+
+    def compose(self) -> ComposeResult:
+        with Container(classes="modal-container"):
+            yield Header()
+            yield Label("Preview", classes="section-title")
+            yield Label("Run directory name (slug):", classes="field-label")
+            yield Input(value=self.suggested_id, id="run-id")
+            with VerticalScroll(classes="preview-yaml"):
+                yield Static(self.run_yaml_text)
+            with Horizontal(classes="button-row"):
+                yield Button("Back to edit", id="back")
+                yield Button("Save run.yaml", id="save", variant="success")
+            yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = "preview"
+        self.query_one("#run-id", Input).focus()
+
+    def action_back(self) -> None:
+        self.dismiss(None)
+
+    def action_save(self) -> None:
+        self._save()
+
+    @_on_event(Button.Pressed, "#back")
+    def _on_back(self) -> None:
+        self.dismiss(None)
+
+    @_on_event(Button.Pressed, "#save")
+    def _on_save(self) -> None:
+        self._save()
+
+    def _save(self) -> None:
+        run_id = self.query_one("#run-id", Input).value.strip()
+        if not run_id or run_id != sanitize_slug(run_id):
+            self.notify("Run ID must be lowercase kebab-case (letters, digits, dots, dashes).", severity="error")
+            return
+        target = TESTS_DIR / self.test_name / "results" / run_id / "run.yaml"
+        if target.exists():
+            self.notify(f"{target.relative_to(REPO_ROOT)} already exists - pick a different ID.", severity="warning")
+            return
+        self.dismiss(run_id)
+
+
+class RunAddScreen(Screen):
+    """Form: record a new run for an existing test."""
+
+    BINDINGS = [
+        Binding("escape", "app.quit", "Cancel"),
+        Binding("ctrl+s", "save", "Preview & save"),
+    ]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.run_stages: list[_RunStageDraft] = []
+        self.test: Optional[Test] = None
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with VerticalScroll(id="content"):
+            yield Label("Test you ran:", classes="field-label")
+            yield Select(
+                options=[(n, n) for n in list_test_names()],
+                id="test-name",
+                allow_blank=False,
+            )
+            yield Label("Your personal URL (GitHub, website, Mastodon...):", classes="field-label")
+            yield Input(placeholder="https://github.com/yourname", id="contributor-url")
+            yield Label("Date of the run (YYYY-MM-DD):", classes="field-label")
+            yield Input(value=date.today().isoformat(), id="date")
+            yield Label("Coding agent / client:", classes="field-label")
+            yield Input(placeholder="e.g. claude-code, cursor, aider, opencode", id="agent-name")
+            yield Label("Agent plan / tier (optional, e.g. pro):", classes="field-label")
+            yield Input(placeholder="empty if N/A", id="agent-plan")
+            yield Label("Inference provider:", classes="field-label")
+            yield Select(
+                options=[(p, p) for p in PROVIDERS],
+                value="anthropic",
+                id="provider",
+                allow_blank=False,
+            )
+            yield Label("Model identifier:", classes="field-label")
+            yield Input(placeholder="e.g. sonnet-4.6", id="model")
+            yield Label("Settings (one 'key=value' per line, optional):", classes="field-label")
+            yield TextArea("", id="settings-area")
+            with Container(id="self-hosted-section", classes="hidden"):
+                yield Label("Self-hosted details", classes="section-title")
+                yield Label("Inference framework:", classes="field-label")
+                yield Input(placeholder="e.g. lm-studio, ollama, llama.cpp, vllm, mlx", id="framework")
+                yield Label("Quantization (optional):", classes="field-label")
+                yield Input(placeholder="e.g. q4_K_M, q8_0, fp16", id="quantization")
+                yield Label("Machine label / device (optional):", classes="field-label")
+                yield Input(placeholder="e.g. nvidia-spark, m3-max, rtx-4090-pc", id="hw-device")
+                yield Label("GPU model (optional):", classes="field-label")
+                yield Input(placeholder="e.g. rtx-4090, h100", id="hw-gpu")
+                yield Label("VRAM in GB (integer, optional):", classes="field-label")
+                yield Input(id="hw-vram")
+                yield Label("System RAM in GB (integer, optional):", classes="field-label")
+                yield Input(id="hw-ram")
+            yield Label("Stages", classes="section-title")
+            yield Label("Select a row, then 'Record' to fill in its metrics.", classes="help-text")
+            yield DataTable(id="run-stages-table", zebra_stripes=True)
+            with Horizontal(classes="button-row"):
+                yield Button("Record selected", id="record-stage", variant="primary")
+                yield Button("Clear selected", id="clear-stage")
+            with Horizontal(classes="button-row"):
+                yield Button("Cancel", id="cancel")
+                yield Button("Preview & save", id="save", variant="success")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.title = "AgentArena"
+        self.app.sub_title = "new run"
+        table = self.query_one("#run-stages-table", DataTable)
+        table.add_columns("Stage", "Status", "Time", "Rating", "Cost")
+        table.cursor_type = "row"
+        names = list_test_names()
+        if names:
+            self._reload_test(names[0])
+        self._update_self_hosted_visibility()
+        self.query_one("#contributor-url", Input).focus()
+
+    def _reload_test(self, test_name: str) -> None:
+        try:
+            self.test = load_test(test_name)
+        except (FileNotFoundError, ValidationError) as e:
+            self.notify(f"Cannot load test '{test_name}': {e}", severity="error")
+            self.test = None
+            return
+        self.run_stages = [_RunStageDraft(stage_id=s.id) for s in self.test.stages]
+        self._refresh_run_stages()
+
+    def _refresh_run_stages(self) -> None:
+        table = self.query_one("#run-stages-table", DataTable)
+        table.clear()
+        for s in self.run_stages:
+            if s.recorded:
+                mins, secs = divmod(s.duration_sec or 0, 60)
+                duration = f"{mins}:{secs:02d}"
+                cost = f"${s.cost_usd:.2f}" if s.cost_usd is not None else "-"
+                table.add_row(s.stage_id, "recorded", duration, s.rating, cost, key=s.stage_id)
+            else:
+                table.add_row(s.stage_id, "-", "-", "-", "-", key=s.stage_id)
+
+    @_on_event(Select.Changed, "#test-name")
+    def _on_test_changed(self, event: Select.Changed) -> None:
+        if event.value not in (Select.BLANK, None):
+            self._reload_test(str(event.value))
+
+    @_on_event(Select.Changed, "#provider")
+    def _on_provider_changed(self, event: Select.Changed) -> None:  # noqa: ARG002
+        self._update_self_hosted_visibility()
+
+    def _update_self_hosted_visibility(self) -> None:
+        section = self.query_one("#self-hosted-section", Container)
+        if str(self.query_one("#provider", Select).value) == "self-hosted":
+            section.remove_class("hidden")
+        else:
+            section.add_class("hidden")
+
+    @_on_event(Button.Pressed, "#record-stage")
+    def _on_record_stage(self) -> None:
+        table = self.query_one("#run-stages-table", DataTable)
+        if table.row_count == 0:
+            return
+        try:
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        except Exception:
+            return
+        stage_id = str(row_key.value)
+        existing = next((s for s in self.run_stages if s.stage_id == stage_id), None)
+        self.app.push_screen(
+            RunStageEditScreen(stage_id, initial=existing if (existing and existing.recorded) else None),
+            lambda result: self._stage_returned(stage_id, result),
+        )
+
+    def _stage_returned(self, stage_id: str, draft: Optional[_RunStageDraft]) -> None:
+        if draft is None:
+            return
+        for i, s in enumerate(self.run_stages):
+            if s.stage_id == stage_id:
+                self.run_stages[i] = draft
+                break
+        self._refresh_run_stages()
+
+    @_on_event(Button.Pressed, "#clear-stage")
+    def _on_clear_stage(self) -> None:
+        table = self.query_one("#run-stages-table", DataTable)
+        if table.row_count == 0:
+            return
+        try:
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        except Exception:
+            return
+        stage_id = str(row_key.value)
+        for i, s in enumerate(self.run_stages):
+            if s.stage_id == stage_id:
+                self.run_stages[i] = _RunStageDraft(stage_id=stage_id)
+                break
+        self._refresh_run_stages()
+
+    @_on_event(Button.Pressed, "#cancel")
+    def _cancel(self) -> None:
+        self.app.exit()
+
+    @_on_event(Button.Pressed, "#save")
+    def _save_button(self) -> None:
+        self.action_save()
+
+    def action_save(self) -> None:
+        test_name = str(self.query_one("#test-name", Select).value)
+        if not test_name or self.test is None:
+            self.notify("Pick a test first.", severity="error")
+            return
+
+        contributor_url = self.query_one("#contributor-url", Input).value.strip()
+        date_raw = self.query_one("#date", Input).value.strip()
+        agent_name = self.query_one("#agent-name", Input).value.strip()
+        agent_plan = self.query_one("#agent-plan", Input).value.strip() or None
+        provider = str(self.query_one("#provider", Select).value)
+        model = self.query_one("#model", Input).value.strip()
+        settings_raw = self.query_one("#settings-area", TextArea).text.strip()
+
+        errors: list[str] = []
+        if not contributor_url.startswith(("http://", "https://")):
+            errors.append("Contributor URL must be a full http(s) URL.")
+        run_date = parse_iso_date(date_raw)
+        if run_date is None:
+            errors.append("Date must be YYYY-MM-DD.")
+        if not agent_name:
+            errors.append("Agent name is required.")
+        if not model:
+            errors.append("Model identifier is required.")
+
+        settings: dict[str, Any] = {}
+        for line in settings_raw.splitlines():
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            if "=" not in line_stripped:
+                errors.append(f"Settings line missing '=': {line_stripped!r}")
+                continue
+            k, _, v = line_stripped.partition("=")
+            settings[k.strip()] = v.strip()
+
+        framework: Optional[str] = None
+        quantization: Optional[str] = None
+        hardware: Optional[Hardware] = None
+        if provider == "self-hosted":
+            framework = self.query_one("#framework", Input).value.strip() or None
+            quantization = self.query_one("#quantization", Input).value.strip() or None
+            device = self.query_one("#hw-device", Input).value.strip() or None
+            gpu = self.query_one("#hw-gpu", Input).value.strip() or None
+            vram_raw = self.query_one("#hw-vram", Input).value.strip()
+            ram_raw = self.query_one("#hw-ram", Input).value.strip()
+            try:
+                vram_gb = int(vram_raw) if vram_raw else None
+            except ValueError:
+                errors.append("VRAM must be an integer (GB).")
+                vram_gb = None
+            try:
+                ram_gb = int(ram_raw) if ram_raw else None
+            except ValueError:
+                errors.append("RAM must be an integer (GB).")
+                ram_gb = None
+            if not framework:
+                errors.append("Framework is required for self-hosted runs.")
+            if any([device, gpu, vram_gb, ram_gb]):
+                hardware = Hardware(device=device, gpu=gpu, vram_gb=vram_gb, ram_gb=ram_gb)
+
+        recorded_stages = [s for s in self.run_stages if s.recorded]
+        if not recorded_stages:
+            errors.append("Record at least one stage.")
+
+        if errors:
+            self.notify("\n".join(errors), severity="error", title="Cannot save")
+            return
+
+        assert run_date is not None
+        try:
+            run = Run(
+                contributor_url=contributor_url,
+                date=run_date,
+                agent=Agent(name=agent_name, plan=agent_plan),
+                provider=provider,
+                framework=framework,
+                model=model,
+                quantization=quantization,
+                settings=settings,
+                hardware=hardware,
+                stages=[RunStage(
+                    id=s.stage_id,
+                    duration_sec=s.duration_sec or 0,
+                    tokens_in=s.tokens_in,
+                    tokens_out=s.tokens_out,
+                    cost_usd=s.cost_usd,
+                    rating=s.rating,
+                    notes=s.notes,
+                ) for s in recorded_stages],
+            )
+        except ValidationError as e:
+            self.notify(str(e), severity="error", title="Schema validation failed")
+            return
+
+        suggested = f"{handle_from_url(contributor_url)}-{agent_name}-{model}"
+        if settings:
+            suggested += "-" + "-".join(f"{k}-{v}" for k, v in settings.items())
+        suggested = sanitize_slug(suggested)
+
+        buf = StringIO()
+        yaml.dump(run_to_yaml(run), buf)
+        self.app.push_screen(
+            _RunPreviewScreen(buf.getvalue(), test_name, suggested),
+            lambda run_id: self._after_preview(run_id, run, test_name, recorded_stages),
+        )
+
+    def _after_preview(self, run_id: Optional[str], run: "Run", test_name: str, recorded_stages: list[_RunStageDraft]) -> None:
+        if run_id is None:
+            return
+        target = TESTS_DIR / test_name / "results" / run_id / "run.yaml"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        write_yaml(target, run_to_yaml(run))
+        for s in recorded_stages:
+            (target.parent / s.stage_id).mkdir(exist_ok=True)
+        self.app.exit(result=str(target.relative_to(REPO_ROOT)))
+
+
+# --------------------------------------------------------------------------- #
 # Typer app
 # --------------------------------------------------------------------------- #
 
@@ -944,345 +1732,43 @@ def browse_cmd() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _required(v: str) -> Any:
-    return True if v and v.strip() else "Required"
-
-
 @run_app.command("add")
 def run_add_cmd() -> None:
     """Interactively record a new run for an existing test."""
-    tests = list_test_names()
-    if not tests:
+    if not list_test_names():
         err_console.print("[red]No tests exist yet. Create one first with `test add`.[/red]")
         raise typer.Exit(1)
-
-    console.rule("[bold cyan]Add a run[/bold cyan]")
-    console.print(
-        "[dim]Tip: you'll be able to manually edit the generated run.yaml file afterwards "
-        "if anything needs tweaking.[/dim]\n"
-    )
-
-    test_name = require(questionary.select("Which test did you run?", choices=tests).ask())
-    test = load_test(test_name)
-
-    contributor_url = require(questionary.text(
-        "Your personal URL (GitHub profile, website, Mastodon, etc.):",
-        validate=lambda v: v.strip().startswith(("http://", "https://")) or "Must be a URL starting with http:// or https://",
-    ).ask()).strip()
-
-    run_date_raw = require(questionary.text(
-        "Date of the run (YYYY-MM-DD):",
-        default=date.today().isoformat(),
-        validate=lambda v: (parse_iso_date(v) is not None) or "Use ISO date format, e.g. 2026-05-16",
-    ).ask())
-    run_date = parse_iso_date(run_date_raw)
-    assert run_date is not None
-
-    agent_choice = require(questionary.select(
-        "Coding agent / client:",
-        choices=["claude-code", "cursor", "aider", "opencode", "other"],
-    ).ask())
-    if agent_choice == "other":
-        agent_choice = require(questionary.text("Agent name:", validate=_required).ask()).strip()
-
-    agent_plan_raw = require(questionary.text(
-        "Agent plan / tier (e.g. 'pro'; empty if N/A):",
-    ).ask()).strip()
-    agent_plan = agent_plan_raw or None
-
-    provider_choice = require(questionary.select(
-        "Inference provider (pick 'self-hosted' if you run the inference yourself, on your own or rented infra):",
-        choices=list(PROVIDERS),
-    ).ask())
-    if provider_choice == "other":
-        provider_choice = require(questionary.text("Provider name:", validate=_required).ask()).strip()
-
-    model = require(questionary.text(
-        "Model identifier (e.g. sonnet-4.6):",
-        validate=_required,
-    ).ask()).strip()
-
-    console.print()
-    console.print("[dim]Add any agent/model settings that affect behavior (e.g. effort=high).[/dim]")
-    console.print("[dim]Leave the key empty to finish.[/dim]")
-    settings: dict[str, Any] = {}
-    while True:
-        key = require(questionary.text("  setting key (empty to finish):").ask()).strip()
-        if not key:
-            break
-        value = require(questionary.text(f"  value for '{key}':").ask()).strip()
-        settings[key] = value
-
-    framework: Optional[str] = None
-    quantization: Optional[str] = None
-    hardware: Optional[Hardware] = None
-    if provider_choice == "self-hosted":
-        console.print()
-        console.print("[dim]Self-hosted inference: tell us about the engine, quantization, and hardware.[/dim]")
-        framework_choice = require(questionary.select(
-            "Inference engine / framework:",
-            choices=list(SELF_HOSTED_FRAMEWORKS),
-        ).ask())
-        if framework_choice == "other":
-            framework = require(questionary.text(
-                "Framework name (e.g. text-generation-webui, gpt4all):",
-                validate=_required,
-            ).ask()).strip()
-        else:
-            framework = framework_choice
-
-        quantization = require(questionary.text(
-            "Quantization (e.g. q4_K_M, q8_0, fp16; empty to skip):"
-        ).ask()).strip() or None
-
-        console.print("[dim]Hardware details (all optional, but recommended):[/dim]")
-        device = require(questionary.text(
-            "  Machine label (e.g. nvidia-spark, m3-max, rtx-4090-pc; empty to skip):"
-        ).ask()).strip() or None
-        gpu = require(questionary.text(
-            "  GPU model (e.g. rtx-4090, h100; empty to skip):"
-        ).ask()).strip() or None
-        vram_raw = require(questionary.text("  VRAM in GB (integer; empty to skip):").ask()).strip()
-        vram_gb = int(vram_raw) if vram_raw else None
-        ram_raw = require(questionary.text("  System RAM in GB (integer; empty to skip):").ask()).strip()
-        ram_gb = int(ram_raw) if ram_raw else None
-        if any([device, gpu, vram_gb, ram_gb]):
-            hardware = Hardware(device=device, gpu=gpu, vram_gb=vram_gb, ram_gb=ram_gb)
-
-    console.rule("Stages")
-    stages: list[RunStage] = []
-    for stage_def in test.stages:
-        ran = require(questionary.confirm(
-            f"Did you run {stage_def.id}?",
-            default=True,
-        ).ask())
-        if not ran:
-            continue
-
-        duration_sec = None
-        while duration_sec is None:
-            raw = require(questionary.text(
-                f"  {stage_def.id} — duration (mm:ss or seconds):",
-                validate=lambda v: (parse_duration(v) is not None) or "Use mm:ss or a number of seconds",
-            ).ask())
-            duration_sec = parse_duration(raw)
-
-        tokens_in_raw = require(questionary.text(
-            "  input tokens (e.g. 12300 or 12.3k; empty to skip):",
-            validate=lambda v: (not v.strip() or parse_token_count(v) is not None) or "Use a number, with optional k/M suffix",
-        ).ask())
-        tokens_in = parse_token_count(tokens_in_raw)
-
-        tokens_out_raw = require(questionary.text(
-            "  output tokens (e.g. 26300 or 26.3k; empty to skip):",
-            validate=lambda v: (not v.strip() or parse_token_count(v) is not None) or "Use a number, with optional k/M suffix",
-        ).ask())
-        tokens_out = parse_token_count(tokens_out_raw)
-
-        cost_raw = require(questionary.text(
-            "  cost in USD (e.g. 0.63; empty to skip):",
-            validate=lambda v: (not v.strip() or parse_cost(v) is not None) or "Use a number, optionally with $",
-        ).ask())
-        cost_usd = parse_cost(cost_raw)
-
-        rating = require(questionary.select(
-            "  rating:",
-            choices=[
-                questionary.Choice(f"{r} — {RATING_BLURB[r]}", value=r) for r in RATINGS
-            ],
-        ).ask())
-
-        notes_raw = require(questionary.text("  notes (optional, single line):").ask()).strip()
-        notes = notes_raw or None
-
-        stages.append(RunStage(
-            id=stage_def.id,
-            duration_sec=duration_sec,
-            tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            cost_usd=cost_usd,
-            rating=rating,
-            notes=notes,
-        ))
-
-    if not stages:
-        console.print("[yellow]No stages recorded. Aborting.[/yellow]")
-        raise typer.Exit(0)
-
-    # Suggest run-id (derived from contributor URL's handle)
-    suggested = f"{handle_from_url(contributor_url)}-{agent_choice}-{model}"
-    if settings:
-        settings_part = "-".join(f"{k}-{v}" for k, v in settings.items())
-        suggested += f"-{settings_part}"
-    suggested = sanitize_slug(suggested)
-
-    run_id = require(questionary.text(
-        "Run directory name (slug):",
-        default=suggested,
-        validate=lambda v: (bool(v.strip()) and v.strip() == sanitize_slug(v)) or "Use lowercase letters, digits, dots, and dashes",
-    ).ask()).strip()
-
-    run = Run(
-        contributor_url=contributor_url,
-        date=run_date,
-        agent=Agent(name=agent_choice, plan=agent_plan),
-        provider=provider_choice,
-        framework=framework,
-        model=model,
-        quantization=quantization,
-        settings=settings,
-        hardware=hardware,
-        stages=stages,
-    )
-
-    target = TESTS_DIR / test_name / "results" / run_id / "run.yaml"
-    console.rule("Preview")
-    buf = StringIO()
-    yaml.dump(run_to_yaml(run), buf)
-    console.print(Syntax(buf.getvalue(), "yaml", theme="ansi_dark", background_color="default"))
-    console.print(f"[dim]Target:[/dim] {target.relative_to(REPO_ROOT)}")
-
-    if target.exists():
-        if not require(questionary.confirm(
-            "That run.yaml already exists. Overwrite?",
-            default=False,
-        ).ask()):
-            console.print("[yellow]Aborted.[/yellow]")
-            raise typer.Exit(0)
-
-    if not require(questionary.confirm("Write run.yaml?", default=True).ask()):
-        console.print("[yellow]Aborted.[/yellow]")
-        raise typer.Exit(0)
-
-    write_yaml(target, run_to_yaml(run))
-    for s in stages:
-        (target.parent / s.id).mkdir(exist_ok=True)
-
-    console.print(f"\n[green]✓[/green] Wrote {target.relative_to(REPO_ROOT)}")
-    console.print("\nNext: drop the source code your LLM produced for each stage into:")
-    for s in stages:
-        console.print(f"  [dim]•[/dim] {(target.parent / s.id).relative_to(REPO_ROOT)}/")
-    console.print(
-        f"\n[dim]You can edit [bold]{target.relative_to(REPO_ROOT)}[/bold] manually at any time.[/dim]"
-    )
-    console.print(
-        "[dim]After making changes, run [bold]scripts/cli.py validate[/bold] "
-        "to check that they still match the schema.[/dim]"
-    )
+    app = AgentArenaApp(initial_stack=[RunAddScreen()])
+    result = app.run()
+    if result:
+        console.print(f"\n[green]✓[/green] Wrote {result}")
+        console.print(
+            "\n[dim]Next: drop the source code your LLM produced for each stage into the "
+            "stage subdirectories that were created.[/dim]"
+        )
+        console.print(
+            "[dim]After making changes, run [bold]scripts/cli.py validate[/bold] "
+            "to check that they still match the schema.[/dim]"
+        )
 
 
 # --------------------------------------------------------------------------- #
-# test add (interactive)
+# test add (Textual form)
 # --------------------------------------------------------------------------- #
 
 
 @test_app.command("add")
 def test_add_cmd() -> None:
     """Interactively create a new test."""
-    console.rule("[bold cyan]Create a new test[/bold cyan]")
-    console.print(
-        "[dim]Tip: you'll be able to manually edit the generated test.yaml file afterwards "
-        "if anything needs tweaking.[/dim]\n"
-    )
-
-    name = require(questionary.text(
-        "Test directory name (kebab-case, e.g. live-message-wall):",
-        validate=lambda v: is_kebab_case(v.strip()) or "Use lowercase kebab-case",
-    ).ask()).strip()
-
-    target_dir = TESTS_DIR / name
-    if target_dir.exists():
-        err_console.print(f"[red]Directory already exists: {target_dir.relative_to(REPO_ROOT)}[/red]")
-        raise typer.Exit(1)
-
-    title = require(questionary.text("Short human-readable title:", validate=_required).ask()).strip()
-    description = require(questionary.text(
-        "Description (one or two sentences):",
-        validate=_required,
-    ).ask()).strip()
-    domain_choice = require(questionary.select(
-        "Domain (optional, pick the closest match):",
-        choices=[questionary.Choice("(skip)", value=None)]
-        + [questionary.Choice(DOMAIN_LABELS[d], value=d) for d in DOMAINS],
-    ).ask())
-    domain = domain_choice
-
-    console.rule("Stages")
-    stages: list[TestStage] = []
-    while True:
-        next_num = len(stages) + 1
-        if stages:
-            if not require(questionary.confirm(f"Add stage {next_num}?", default=True).ask()):
-                break
-
-        stage_id_prefix = f"stage-{next_num}-"
-        stage_id = require(questionary.text(
-            f"Stage {next_num} id (must start with '{stage_id_prefix}'):",
-            default=stage_id_prefix,
-            validate=lambda v: (v.strip().startswith(stage_id_prefix) and is_kebab_case(v.strip())) or f"Must be kebab-case starting with '{stage_id_prefix}'",
-        ).ask()).strip()
-
-        theme = require(questionary.select(
-            "Theme (pick the closest match):",
-            choices=[questionary.Choice(THEME_LABELS[t], value=t) for t in THEMES],
-        ).ask())
-
-        prompt = read_pasted_text(f"Prompt for {stage_id} (will be fed to the LLM verbatim):")
-        if not prompt:
-            err_console.print("[red]Prompt cannot be empty.[/red]")
-            raise typer.Exit(1)
-
-        builds_on: Optional[str] = None
-        if stages:
-            previous_ids = [s.id for s in stages]
-            choice = require(questionary.select(
-                "Does this stage build on a previous one?",
-                choices=["(no)"] + previous_ids,
-                default=previous_ids[-1],
-            ).ask())
-            builds_on = None if choice == "(no)" else choice
-
-        stages.append(TestStage(
-            id=stage_id,
-            theme=theme,
-            prompt=prompt,
-            builds_on=builds_on,
-        ))
-
-    if not stages:
-        console.print("[yellow]No stages added. Aborting.[/yellow]")
-        raise typer.Exit(0)
-
-    test = Test(
-        name=name,
-        title=title,
-        description=description,
-        domain=domain,
-        stages=stages,
-    )
-
-    console.rule("Preview")
-    buf = StringIO()
-    yaml.dump(test_to_yaml(test), buf)
-    console.print(Syntax(buf.getvalue(), "yaml", theme="ansi_dark", background_color="default"))
-    console.print(f"[dim]Target:[/dim] {(target_dir / 'test.yaml').relative_to(REPO_ROOT)}")
-
-    if not require(questionary.confirm("Create test directory and write test.yaml?", default=True).ask()):
-        console.print("[yellow]Aborted.[/yellow]")
-        raise typer.Exit(0)
-
-    write_yaml(target_dir / "test.yaml", test_to_yaml(test))
-    (target_dir / "results").mkdir(exist_ok=True)
-    test_yaml_path = (target_dir / "test.yaml").relative_to(REPO_ROOT)
-    console.print(f"\n[green]✓[/green] Created {target_dir.relative_to(REPO_ROOT)}/")
-    console.print(
-        f"\n[dim]You can edit [bold]{test_yaml_path}[/bold] manually at any time.[/dim]"
-    )
-    console.print(
-        "[dim]After making changes, run [bold]scripts/cli.py validate[/bold] "
-        "to check that they still match the schema.[/dim]"
-    )
-
+    app = AgentArenaApp(initial_stack=[TestAddScreen()])
+    result = app.run()
+    if result:
+        console.print(f"\n[green]✓[/green] Wrote {result}")
+        console.print(
+            f"\n[dim]You can edit {result} manually at any time.[/dim]\n"
+            "[dim]After making changes, run [bold]scripts/cli.py validate[/bold] "
+            "to check that they still match the schema.[/dim]"
+        )
 
 # --------------------------------------------------------------------------- #
 # validate
