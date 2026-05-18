@@ -1833,10 +1833,10 @@ def _cross_check_run(test_name: str, run_id: str, valid_stage_ids: set[str]) -> 
 def validate_cmd(
     path: Optional[Path] = typer.Argument(
         None,
-        help="Optional path to a single test.yaml or run.yaml. Validates the whole repo if omitted.",
+        help="Path to a single test.yaml or run.yaml to validate. Omit to validate every YAML file in the repo.",
     ),
 ) -> None:
-    """Validate test.yaml and run.yaml files."""
+    """Validate every test.yaml/run.yaml in the repo, or just the file at PATH if given."""
     errors: list[tuple[Path, str]] = []
 
     if path is not None:
