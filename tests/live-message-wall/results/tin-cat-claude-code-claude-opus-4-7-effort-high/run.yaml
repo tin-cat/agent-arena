@@ -1,0 +1,35 @@
+contributor_url: https://github.com/tin-cat
+date: 2026-05-18
+agent:
+  name: claude-code
+  plan: pro
+provider: anthropic
+model: claude-opus-4-7
+settings:
+  effort: high
+stages:
+  - id: stage-1-first-run
+    duration_sec: 176
+    tokens_in: 530
+    tokens_out: 13500
+    cost_usd: 0.73
+    rating: excellent
+  - id: stage-2-advanced-features
+    duration_sec: 328
+    tokens_in: 568
+    tokens_out: 21800
+    cost_usd: 1.88
+    rating: excellent
+  - id: stage-3-refinements
+    duration_sec: 778
+    tokens_in: 574
+    tokens_out: 62200
+    cost_usd: 4.63
+    rating: good
+    notes: Struggled for some minutes around an error involving regex, unicode characters and broken null bytes.
+  - id: stage-4-complex-refinements
+    duration_sec: 570
+    tokens_in: 579
+    tokens_out: 41700
+    cost_usd: 3.95
+    rating: excellent
