@@ -3,8 +3,9 @@ Please feel free to contribute your own tests and runs of existing tests to this
 
 Contributions should be submitted as a GitHub Pull Request against `main`: Fork the repo, add your run or test on a branch, push it to your fork, and open a PR.
 
-> [!INFO]
+> [!IMPORTANT]
 > **⚔ The contributor's code ⚔**
+>
 > There is no referee in this arena. No anti-cheat watches your terminal. No tribunal reviews the tape. The leaderboard rests entirely on **your honor**.
 >
 > Run the stages exactly as written. Report the time, the costs, and the rating you actually got. Be honest. *Especially* when your favorite stack stumbles. Your data is what helps the community.
@@ -52,8 +53,8 @@ You can also contribute tests and runs by adding the YAML files and directories 
 
 ### `run.yaml` schema
 
-> [!NOTE]
-**contributor_url is your unique ID**. Always use the exact same URL so the leaderboard can group your runs and accumulate your ranking. If you use your GitHub profile URL, your GitHub profile image will automatically display on the leaderboard.
+> [!IMPORTANT]
+> **contributor_url is your unique ID**. Always use the exact same URL so the leaderboard can group your runs and accumulate your ranking. If you use your GitHub profile URL, your GitHub profile image will automatically display on the leaderboard.
 
 ```yaml
 contributor_url: https://github.com/your-username   # see the note above — must match across all your contributions
@@ -127,7 +128,7 @@ If your github username were `anthony` and you ran the first two stages of the `
 
 ### `test.yaml` schema
 
-> [!NOTE]
+> [!IMPORTANT]
 **contributor_url is your unique ID**. Always use the exact same URL so the leaderboard can group your runs and accumulate your ranking. If you use your GitHub profile URL, your GitHub profile image will automatically display on the leaderboard.
 
 ```yaml
