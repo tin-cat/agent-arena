@@ -176,6 +176,7 @@ _bootstrap()
 # Real imports — guaranteed available now that _bootstrap() returned.
 # ----------------------------------------------------------------------------
 
+import json
 import re
 import typing
 from datetime import date
@@ -243,28 +244,36 @@ ThemeT = Literal[
 DOMAINS: tuple[str, ...] = typing.get_args(DomainT)
 THEMES: tuple[str, ...] = typing.get_args(ThemeT)
 
-# Fixed set of coding agents / clients. Add new entries here as they emerge.
-# Anything not on this list will fail validation; use "other" as the catch-all.
-AgentNameT = Literal[
-    "aider", "amazon-q", "amp", "bolt", "claude-code", "cline", "cody",
-    "codex", "continue", "copilot", "crush", "cursor", "devin", "gemini-cli",
-    "goose", "jetbrains-ai", "kiro", "lovable", "opencode", "openhands",
-    "pearai", "qwen-code", "replit-agent", "roo-code", "supermaven",
-    "tabnine", "trae", "v0", "windsurf", "zed", "other",
-]
-AGENT_NAMES: tuple[str, ...] = typing.get_args(AgentNameT)
+# Coding agents and inference providers — the source of truth is the
+# /agents.json and /providers.json files at the repo root, so both the CLI and
+# the generated site can consume the same data (id, name, description,
+# homepage, category, logo). Anything not in those files fails validation;
+# the "other" id is the catch-all.
 
-# Fixed set of inference providers. Add new entries here as they emerge.
-# Anything not on this list will fail validation; use "other" as the catch-all.
-ProviderT = Literal[
-    "anthropic", "openai", "gemini", "openrouter",
-    "azure", "vertex", "bedrock", "github-models",
-    "groq", "together", "fireworks", "cerebras", "deepinfra",
-    "replicate", "sambanova", "nvidia-nim", "huggingface",
-    "mistral", "deepseek", "xai", "cohere", "perplexity",
-    "self-hosted", "other",
-]
-PROVIDERS: tuple[str, ...] = typing.get_args(ProviderT)
+def _load_id_list(filename: str) -> tuple[str, ...]:
+    path = REPO_ROOT / filename
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        sys.stderr.write(f"\n[AgentArena] Missing {filename} at repo root.\n")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"\n[AgentArena] {filename}: invalid JSON: {e}\n")
+        sys.exit(1)
+    if not isinstance(entries, list):
+        sys.stderr.write(f"\n[AgentArena] {filename}: top level must be a JSON array.\n")
+        sys.exit(1)
+    ids: list[str] = []
+    for i, entry in enumerate(entries):
+        if not isinstance(entry, dict) or "id" not in entry:
+            sys.stderr.write(f"\n[AgentArena] {filename}[{i}]: each entry must be an object with an 'id'.\n")
+            sys.exit(1)
+        ids.append(entry["id"])
+    return tuple(ids)
+
+
+AGENT_NAMES: tuple[str, ...] = _load_id_list("agents.json")
+PROVIDERS: tuple[str, ...] = _load_id_list("providers.json")
 
 SELF_HOSTED_FRAMEWORKS = ("lm-studio", "ollama", "llama.cpp", "vllm", "mlx", "other")
 
@@ -310,8 +319,16 @@ class Hardware(BaseModel, extra="allow"):
 
 
 class Agent(BaseModel):
-    name: AgentNameT
+    name: str
     plan: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def _check_name(cls, v: str) -> str:
+        if v not in AGENT_NAMES:
+            opts = ", ".join(f"'{n}'" for n in AGENT_NAMES)
+            raise ValueError(f"must be one of {opts} (see /agents.json)")
+        return v
 
 
 class RunStage(BaseModel):
@@ -328,7 +345,7 @@ class Run(BaseModel):
     contributor_url: str                # URL identifying the contributor (GitHub profile, personal site, Mastodon, etc.)
     date: date                          # the day the run was performed (YYYY-MM-DD)
     agent: Agent
-    provider: ProviderT
+    provider: str
     framework: Optional[str] = None     # inference engine (e.g. lm-studio, ollama, vllm). Required when provider == "self-hosted".
     model: str
     quantization: Optional[str] = None  # how the model is loaded (e.g. q4_K_M, fp16). Meaningful for self-hosted inference.
@@ -342,6 +359,14 @@ class Run(BaseModel):
         v = v.strip()
         if not v.startswith(("http://", "https://")):
             raise ValueError("must be a URL starting with http:// or https://")
+        return v
+
+    @field_validator("provider")
+    @classmethod
+    def _check_provider(cls, v: str) -> str:
+        if v not in PROVIDERS:
+            opts = ", ".join(f"'{n}'" for n in PROVIDERS)
+            raise ValueError(f"must be one of {opts} (see /providers.json)")
         return v
 
     @model_validator(mode="after")

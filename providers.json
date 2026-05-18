@@ -1,0 +1,190 @@
+[
+  {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "description": "First-party API for Claude models.",
+    "homepage": "https://www.anthropic.com/api",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/anthropic.svg"
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "description": "First-party API for GPT and o-series models.",
+    "homepage": "https://platform.openai.com",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/openai.svg"
+  },
+  {
+    "id": "gemini",
+    "name": "Google AI Studio",
+    "description": "Google's first-party Gemini API for developers.",
+    "homepage": "https://ai.google.dev",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/gemini.svg"
+  },
+  {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "description": "Unified API that aggregates models from many providers behind a single endpoint.",
+    "homepage": "https://openrouter.ai",
+    "category": "inference-platform",
+    "logo": "/logos/providers/openrouter.svg"
+  },
+  {
+    "id": "azure",
+    "name": "Azure OpenAI",
+    "description": "Microsoft Azure's hosted OpenAI service with enterprise compliance and regional deployments.",
+    "homepage": "https://azure.microsoft.com/products/ai-services/openai-service",
+    "category": "cloud",
+    "logo": "/logos/providers/azure.svg"
+  },
+  {
+    "id": "vertex",
+    "name": "Google Cloud Vertex AI",
+    "description": "Google Cloud's enterprise platform for Gemini and partner models.",
+    "homepage": "https://cloud.google.com/vertex-ai",
+    "category": "cloud",
+    "logo": "/logos/providers/vertex.svg"
+  },
+  {
+    "id": "bedrock",
+    "name": "Amazon Bedrock",
+    "description": "AWS's managed service for foundation models from Anthropic, Meta, Mistral, and others.",
+    "homepage": "https://aws.amazon.com/bedrock/",
+    "category": "cloud",
+    "logo": "/logos/providers/bedrock.svg"
+  },
+  {
+    "id": "github-models",
+    "name": "GitHub Models",
+    "description": "GitHub's inference endpoint exposing models from multiple providers under one API.",
+    "homepage": "https://github.com/marketplace/models",
+    "category": "cloud",
+    "logo": "/logos/providers/github-models.svg"
+  },
+  {
+    "id": "groq",
+    "name": "Groq",
+    "description": "Ultra-low-latency inference on custom LPU hardware, hosting open-weight models.",
+    "homepage": "https://groq.com",
+    "category": "inference-platform",
+    "logo": "/logos/providers/groq.svg"
+  },
+  {
+    "id": "together",
+    "name": "Together AI",
+    "description": "Inference platform for open-weight models with fine-tuning and dedicated endpoints.",
+    "homepage": "https://together.ai",
+    "category": "inference-platform",
+    "logo": "/logos/providers/together.svg"
+  },
+  {
+    "id": "fireworks",
+    "name": "Fireworks AI",
+    "description": "Fast inference platform for open-weight models with serverless and dedicated deployments.",
+    "homepage": "https://fireworks.ai",
+    "category": "inference-platform",
+    "logo": "/logos/providers/fireworks.svg"
+  },
+  {
+    "id": "cerebras",
+    "name": "Cerebras Inference",
+    "description": "Wafer-scale inference platform delivering very high tokens-per-second for open-weight models.",
+    "homepage": "https://cerebras.ai/inference",
+    "category": "inference-platform",
+    "logo": "/logos/providers/cerebras.svg"
+  },
+  {
+    "id": "deepinfra",
+    "name": "DeepInfra",
+    "description": "Pay-per-token inference platform for a wide catalog of open-weight models.",
+    "homepage": "https://deepinfra.com",
+    "category": "inference-platform",
+    "logo": "/logos/providers/deepinfra.svg"
+  },
+  {
+    "id": "replicate",
+    "name": "Replicate",
+    "description": "Cloud platform for running open-source models on demand via API.",
+    "homepage": "https://replicate.com",
+    "category": "inference-platform",
+    "logo": "/logos/providers/replicate.svg"
+  },
+  {
+    "id": "sambanova",
+    "name": "SambaNova Cloud",
+    "description": "High-throughput inference on custom reconfigurable dataflow hardware.",
+    "homepage": "https://cloud.sambanova.ai",
+    "category": "inference-platform",
+    "logo": "/logos/providers/sambanova.svg"
+  },
+  {
+    "id": "nvidia-nim",
+    "name": "NVIDIA NIM",
+    "description": "NVIDIA's hosted inference microservices for open-weight and partner models.",
+    "homepage": "https://build.nvidia.com",
+    "category": "inference-platform",
+    "logo": "/logos/providers/nvidia-nim.svg"
+  },
+  {
+    "id": "huggingface",
+    "name": "Hugging Face",
+    "description": "Hugging Face Inference Endpoints and Serverless Inference for open-weight models.",
+    "homepage": "https://huggingface.co/inference-endpoints",
+    "category": "inference-platform",
+    "logo": "/logos/providers/huggingface.svg"
+  },
+  {
+    "id": "mistral",
+    "name": "Mistral",
+    "description": "Mistral AI's first-party La Plateforme API for Mistral models.",
+    "homepage": "https://mistral.ai",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/mistral.svg"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "description": "DeepSeek's first-party API for DeepSeek models.",
+    "homepage": "https://www.deepseek.com",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/deepseek.svg"
+  },
+  {
+    "id": "xai",
+    "name": "xAI",
+    "description": "xAI's first-party API for Grok models.",
+    "homepage": "https://x.ai/api",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/xai.svg"
+  },
+  {
+    "id": "cohere",
+    "name": "Cohere",
+    "description": "Cohere's first-party API for Command-series models.",
+    "homepage": "https://cohere.com",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/cohere.svg"
+  },
+  {
+    "id": "perplexity",
+    "name": "Perplexity",
+    "description": "Perplexity's first-party API for Sonar models with built-in web grounding.",
+    "homepage": "https://www.perplexity.ai/hub/blog/introducing-pplx-api",
+    "category": "frontier-lab",
+    "logo": "/logos/providers/perplexity.svg"
+  },
+  {
+    "id": "self-hosted",
+    "name": "Self-hosted",
+    "description": "You run the inference yourself, on your own hardware or rented infrastructure. Specify the inference engine in the `framework` field.",
+    "category": "self-hosted"
+  },
+  {
+    "id": "other",
+    "name": "Other",
+    "description": "Use this if the inference provider isn't in the list yet. Please open a PR to add it.",
+    "category": "other"
+  }
+]

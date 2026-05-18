@@ -61,10 +61,10 @@ contributor_url: https://github.com/your-username   # see the note above — mus
 date: 2026-05-16              # the day the run was performed (YYYY-MM-DD)
 
 agent:
-  name: claude-code           # one of: aider, amazon-q, amp, bolt, claude-code, cline, cody, codex, continue, copilot, crush, cursor, devin, gemini-cli, goose, jetbrains-ai, kiro, lovable, opencode, openhands, pearai, qwen-code, replit-agent, roo-code, supermaven, tabnine, trae, v0, windsurf, zed, other
+  name: claude-code           # must match an `id` from /agents.json (see that file for the full list, descriptions, and homepages)
   plan: pro                   # optional; the agent's plan or tier
 
-provider: anthropic           # one of: anthropic, openai, gemini, openrouter, azure, vertex, bedrock, github-models, groq, together, fireworks, cerebras, deepinfra, replicate, sambanova, nvidia-nim, huggingface, mistral, deepseek, xai, cohere, perplexity, self-hosted, other
+provider: anthropic           # must match an `id` from /providers.json (see that file for the full list, descriptions, and homepages)
 model: sonnet-4.6             # the official model identifier — see the note below
 settings:                     # any agent or model settings that affect behavior
   effort: high
@@ -102,6 +102,10 @@ Please use the **official** identifier so runs of the same model can be grouped 
 - **Closed / hosted models:** use the canonical name from the provider's docs (e.g. `sonnet-4.6`, `gpt-5-mini`, `gemini-2.5-pro`).
 - **Open-weight models:** use the Hugging Face repo path in `org/repo` form (e.g. `meta-llama/Llama-3.3-70B-Instruct`, `Qwen/Qwen2.5-Coder-32B-Instruct`). Browse [huggingface.co/models](https://huggingface.co/models) to find it.
 - For a cross-provider catalog of model IDs, [openrouter.ai/models](https://openrouter.ai/models) is a convenient reference.
+
+### Adding a new agent or provider
+
+If your coding agent or inference provider isn't listed in [`/agents.json`](/agents.json) or [`/providers.json`](/providers.json) yet, open a PR adding it. Each entry needs an `id` (kebab-case, used in `run.yaml`), `name`, `description`, `homepage`, and `category`. Optionally drop an SVG at `/logos/agents/<id>.svg` or `/logos/providers/<id>.svg` — see [`/logos/README.md`](/logos/README.md). Until then, use `other` and add a note in the `settings:` block.
 
 ### Rating scale
 

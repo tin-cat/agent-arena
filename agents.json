@@ -1,0 +1,248 @@
+[
+  {
+    "id": "aider",
+    "name": "Aider",
+    "description": "Open-source AI pair programmer that runs in your terminal and edits code in your local git repo.",
+    "homepage": "https://aider.chat",
+    "category": "cli",
+    "logo": "/logos/agents/aider.svg"
+  },
+  {
+    "id": "amazon-q",
+    "name": "Amazon Q Developer",
+    "description": "AWS's AI assistant for software development, integrated into IDEs and the command line.",
+    "homepage": "https://aws.amazon.com/q/developer/",
+    "category": "ide",
+    "logo": "/logos/agents/amazon-q.svg"
+  },
+  {
+    "id": "amp",
+    "name": "Amp",
+    "description": "Sourcegraph's agentic coding tool that runs in the terminal and integrates with editors.",
+    "homepage": "https://ampcode.com",
+    "category": "cli",
+    "logo": "/logos/agents/amp.svg"
+  },
+  {
+    "id": "bolt",
+    "name": "Bolt",
+    "description": "StackBlitz's web-based AI app builder that scaffolds and runs full-stack apps in the browser.",
+    "homepage": "https://bolt.new",
+    "category": "web",
+    "logo": "/logos/agents/bolt.svg"
+  },
+  {
+    "id": "claude-code",
+    "name": "Claude Code",
+    "description": "Anthropic's official CLI for agentic coding in the terminal, with IDE integrations.",
+    "homepage": "https://www.anthropic.com/claude-code",
+    "category": "cli",
+    "logo": "/logos/agents/claude-code.svg"
+  },
+  {
+    "id": "cline",
+    "name": "Cline",
+    "description": "Open-source autonomous coding agent that runs as a VS Code extension.",
+    "homepage": "https://cline.bot",
+    "category": "ide",
+    "logo": "/logos/agents/cline.svg"
+  },
+  {
+    "id": "cody",
+    "name": "Cody",
+    "description": "Sourcegraph's AI coding assistant for editors, with codebase-aware chat and edits.",
+    "homepage": "https://sourcegraph.com/cody",
+    "category": "ide",
+    "logo": "/logos/agents/cody.svg"
+  },
+  {
+    "id": "codex",
+    "name": "Codex CLI",
+    "description": "OpenAI's official open-source agentic coding CLI.",
+    "homepage": "https://github.com/openai/codex",
+    "category": "cli",
+    "logo": "/logos/agents/codex.svg"
+  },
+  {
+    "id": "continue",
+    "name": "Continue",
+    "description": "Open-source AI coding assistant for VS Code and JetBrains, bring-your-own-model.",
+    "homepage": "https://continue.dev",
+    "category": "ide",
+    "logo": "/logos/agents/continue.svg"
+  },
+  {
+    "id": "copilot",
+    "name": "GitHub Copilot",
+    "description": "GitHub's AI pair programmer, available in major IDEs and on the GitHub website.",
+    "homepage": "https://github.com/features/copilot",
+    "category": "ide",
+    "logo": "/logos/agents/copilot.svg"
+  },
+  {
+    "id": "crush",
+    "name": "Crush",
+    "description": "Charm's open-source terminal coding agent with a TUI interface.",
+    "homepage": "https://github.com/charmbracelet/crush",
+    "category": "cli",
+    "logo": "/logos/agents/crush.svg"
+  },
+  {
+    "id": "cursor",
+    "name": "Cursor",
+    "description": "AI-first code editor built on VS Code, with first-class agent and tab features.",
+    "homepage": "https://cursor.com",
+    "category": "ide",
+    "logo": "/logos/agents/cursor.svg"
+  },
+  {
+    "id": "devin",
+    "name": "Devin",
+    "description": "Cognition's fully autonomous software engineer that runs long-horizon tasks in a sandbox.",
+    "homepage": "https://devin.ai",
+    "category": "autonomous",
+    "logo": "/logos/agents/devin.svg"
+  },
+  {
+    "id": "gemini-cli",
+    "name": "Gemini CLI",
+    "description": "Google's official open-source agentic CLI for Gemini models.",
+    "homepage": "https://github.com/google-gemini/gemini-cli",
+    "category": "cli",
+    "logo": "/logos/agents/gemini-cli.svg"
+  },
+  {
+    "id": "goose",
+    "name": "Goose",
+    "description": "Block's open-source on-machine AI agent for developers, extensible via MCP.",
+    "homepage": "https://block.github.io/goose/",
+    "category": "cli",
+    "logo": "/logos/agents/goose.svg"
+  },
+  {
+    "id": "jetbrains-ai",
+    "name": "JetBrains AI Assistant",
+    "description": "JetBrains' built-in AI assistant for IntelliJ-family IDEs.",
+    "homepage": "https://www.jetbrains.com/ai-assistant/",
+    "category": "ide",
+    "logo": "/logos/agents/jetbrains-ai.svg"
+  },
+  {
+    "id": "kiro",
+    "name": "Kiro",
+    "description": "AWS's agentic IDE focused on spec-driven development.",
+    "homepage": "https://kiro.dev",
+    "category": "ide",
+    "logo": "/logos/agents/kiro.svg"
+  },
+  {
+    "id": "lovable",
+    "name": "Lovable",
+    "description": "Web-based AI app builder that generates full-stack apps from natural-language prompts.",
+    "homepage": "https://lovable.dev",
+    "category": "web",
+    "logo": "/logos/agents/lovable.svg"
+  },
+  {
+    "id": "opencode",
+    "name": "opencode",
+    "description": "Open-source AI coding agent for the terminal with a polished TUI.",
+    "homepage": "https://opencode.ai",
+    "category": "cli",
+    "logo": "/logos/agents/opencode.svg"
+  },
+  {
+    "id": "openhands",
+    "name": "OpenHands",
+    "description": "Open-source autonomous AI software-engineering agent (formerly OpenDevin).",
+    "homepage": "https://github.com/All-Hands-AI/OpenHands",
+    "category": "autonomous",
+    "logo": "/logos/agents/openhands.svg"
+  },
+  {
+    "id": "pearai",
+    "name": "PearAI",
+    "description": "Open-source AI code editor, a fork of VS Code with integrated agent features.",
+    "homepage": "https://trypear.ai",
+    "category": "ide",
+    "logo": "/logos/agents/pearai.svg"
+  },
+  {
+    "id": "qwen-code",
+    "name": "Qwen Code",
+    "description": "Alibaba's official agentic CLI for Qwen Code models.",
+    "homepage": "https://github.com/QwenLM/qwen-code",
+    "category": "cli",
+    "logo": "/logos/agents/qwen-code.svg"
+  },
+  {
+    "id": "replit-agent",
+    "name": "Replit Agent",
+    "description": "Replit's in-browser AI agent that builds and deploys apps from a single prompt.",
+    "homepage": "https://replit.com/agent",
+    "category": "web",
+    "logo": "/logos/agents/replit-agent.svg"
+  },
+  {
+    "id": "roo-code",
+    "name": "Roo Code",
+    "description": "Open-source autonomous coding agent for VS Code, originally forked from Cline.",
+    "homepage": "https://github.com/RooCodeInc/Roo-Code",
+    "category": "ide",
+    "logo": "/logos/agents/roo-code.svg"
+  },
+  {
+    "id": "supermaven",
+    "name": "Supermaven",
+    "description": "Long-context AI code completion for major IDEs.",
+    "homepage": "https://supermaven.com",
+    "category": "ide",
+    "logo": "/logos/agents/supermaven.svg"
+  },
+  {
+    "id": "tabnine",
+    "name": "Tabnine",
+    "description": "AI code completion and chat for major IDEs, with self-hosting options.",
+    "homepage": "https://www.tabnine.com",
+    "category": "ide",
+    "logo": "/logos/agents/tabnine.svg"
+  },
+  {
+    "id": "trae",
+    "name": "Trae",
+    "description": "ByteDance's AI-powered IDE built on VS Code.",
+    "homepage": "https://trae.ai",
+    "category": "ide",
+    "logo": "/logos/agents/trae.svg"
+  },
+  {
+    "id": "v0",
+    "name": "v0",
+    "description": "Vercel's web-based AI generator for UI components and full-stack apps.",
+    "homepage": "https://v0.dev",
+    "category": "web",
+    "logo": "/logos/agents/v0.svg"
+  },
+  {
+    "id": "windsurf",
+    "name": "Windsurf",
+    "description": "AI-native IDE built on VS Code, with agentic and tab-completion features.",
+    "homepage": "https://windsurf.com",
+    "category": "ide",
+    "logo": "/logos/agents/windsurf.svg"
+  },
+  {
+    "id": "zed",
+    "name": "Zed",
+    "description": "High-performance multiplayer code editor with built-in AI agent features.",
+    "homepage": "https://zed.dev",
+    "category": "ide",
+    "logo": "/logos/agents/zed.svg"
+  },
+  {
+    "id": "other",
+    "name": "Other",
+    "description": "Use this if the coding agent you used isn't in the list yet. Please open a PR to add it.",
+    "category": "other"
+  }
+]
