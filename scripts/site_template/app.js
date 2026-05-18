@@ -485,7 +485,8 @@ function testDetailHTML(t) {
       <div class="panel-body">
         <p style="margin:0 0 16px; color:var(--text-dim)">${esc(t.description)}</p>
         <div class="kv-grid">
-          ${t.contributor_handle ? `<div><span class="k">authored by</span><span class="v"><a href="/contributors/${encodeURIComponent(t.contributor_handle)}/">${esc(t.contributor_handle)}</a></span></div>` : ''}
+          ${t.contributor_handle ? `<div><span class="k">authored by</span><span class="v"><a class="author-inline" href="/contributors/${encodeURIComponent(t.contributor_handle)}/">${t.contributor_avatar ? `<img class="avatar-thumb" src="${esc(t.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(t.contributor_handle)}</span></a></span></div>` : ''}
+          ${t.domain ? `<div><span class="k">domain</span><span class="v"><span class="pill">${esc(t.domain)}</span></span></div>` : ''}
           <div><span class="k">stages</span><span class="v">${t.stages_total}</span></div>
           <div><span class="k">contributed runs</span><span class="v">${t.run_count}</span></div>
           <div><span class="k">top score</span><span class="v t-cyan">${fmtScore(t.runs[0]?.avg_rating_score)}</span></div>
@@ -752,7 +753,7 @@ function runsTableHTML(runs, opts = {}) {
       <tr class="clickable" onclick="navigate('/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
         ${showTest ? `<td><a href="/tests/${esc(r.test_name)}/">${esc(r.test_name)}</a></td>` : ''}
         <td><a href="/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/"><code>${esc(r.run_id)}</code></a></td>
-        <td><a href="${esc(r.contributor_url)}" rel="noopener">${esc(r.contributor_handle)}</a></td>
+        <td><a class="author-inline" href="${esc(r.contributor_url)}" rel="noopener">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
         <td>${esc(r.agent)} · <b>${esc(r.model)}</b> <span class="pill muted">${esc(r.provider)}</span></td>
         <td>${ratingDots(r.stages, r.stages_total)}</td>
         <td style="min-width:170px">${bar(r.avg_rating_score)}</td>
@@ -1185,11 +1186,15 @@ function renderHardware() {
 
 function hardwareCombosHTML(rows) {
   if (!rows.length) return '<div style="padding:14px;color:var(--text-mute)">none yet.</div>';
+  const contributorsCell = (r) => (r.contributors && r.contributors.length)
+    ? r.contributors.map((c) =>
+        `<a href="/contributors/${encodeURIComponent(c.handle)}/">${esc(c.handle)}</a>`).join(', ')
+    : '<span class="t-mute">—</span>';
   return `<table>
     <thead><tr>
       <th class="rank">#</th>
       <th>device · gpu</th>
-      <th>model</th>
+      <th>contributor</th>
       <th>framework</th>
       <th class="num">vram</th>
       <th class="num">ram</th>
@@ -1202,7 +1207,7 @@ function hardwareCombosHTML(rows) {
       <tr>
         <td class="rank${r.rank === 1 ? ' top' : ''}">${r.rank}</td>
         <td><b>${esc(r.device || '—')}</b>${r.gpu ? ` · <span class="t-dim">${esc(r.gpu)}</span>` : ''}</td>
-        <td>${esc(r.model)}${r.quantization ? ` <span class="pill muted">${esc(r.quantization)}</span>` : ''}</td>
+        <td>${contributorsCell(r)}</td>
         <td>${r.framework ? `<span class="pill">${esc(r.framework)}</span>` : '<span class="t-mute">—</span>'}</td>
         <td class="num">${r.vram_gb ? r.vram_gb + ' gb' : '—'}</td>
         <td class="num">${r.ram_gb ? r.ram_gb + ' gb' : '—'}</td>
@@ -1329,9 +1334,12 @@ function mountScatter() {
         backgroundColor:      'rgba(90,209,255,.45)',
         borderColor:          '#5ad1ff',
         borderWidth:          1.5,
-        hoverBackgroundColor: 'rgba(90,209,255,.75)',
+        // Hover: swap the whole fill to magenta (and match the border to it)
+        // instead of adding a contrasting outline. Keeps border width constant
+        // so the bubble doesn't visually jump when moused over.
+        hoverBackgroundColor: 'rgba(255,106,213,.7)',
         hoverBorderColor:     '#ff6ad5',
-        hoverBorderWidth:     2,
+        hoverBorderWidth:     1.5,
       }],
     },
     options: {

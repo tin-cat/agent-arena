@@ -152,7 +152,7 @@ description: |                  # one or two sentences describing what the test 
   A real-time, anonymous message wall web app with a TUI-inspired aesthetic.
   Later stages add lazy loading, rate limiting, fading by age, and replies.
 
-domain: full-stack-web          # optional; one of: full-stack-web, backend, frontend, cli, mobile, data, library, other
+domain: full-stack-web          # optional; one of: full-stack-web, backend, frontend, cli, mobile, game, data, library, other
 
 stages:                         # ordered list, each stage built on top of the previous
   - id: stage-1-first-run       # kebab-case; matches the stage directory name contributed runs will use

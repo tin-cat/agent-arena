@@ -701,6 +701,18 @@ td .pill { vertical-align: middle; }
   text-shadow: var(--glow-cyan);
 }
 
+/* Compact "avatar · handle" combo used inline next to text (e.g. the test
+   detail's "authored by" row in the kv-grid). */
+.author-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.author-inline .avatar-thumb {
+  width: 22px; height: 22px;
+  border-radius: 3px;
+}
+
 /* profile hero */
 .profile-hero {
   background:

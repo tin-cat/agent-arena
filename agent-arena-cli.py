@@ -235,7 +235,7 @@ RATING_BLURB = {
 
 DomainT = Literal[
     "full-stack-web", "backend", "frontend", "cli",
-    "mobile", "data", "library", "other",
+    "mobile", "game", "data", "library", "other",
 ]
 ThemeT = Literal[
     "bootstrap", "features", "refinements", "refactor",
@@ -283,6 +283,7 @@ DOMAIN_LABELS = {
     "frontend":       "frontend       — UI-only (SPA, static site)",
     "cli":            "cli            — command-line tool or script",
     "mobile":         "mobile         — iOS / Android / cross-platform",
+    "game":           "game           — game, simulation, or interactive toy",
     "data":           "data           — pipelines, ETL, analytics",
     "library":        "library        — SDK, library, or framework",
     "other":          "other",

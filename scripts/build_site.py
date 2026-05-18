@@ -153,7 +153,7 @@ RATING_COLOR = {
 
 DomainT = Literal[
     "full-stack-web", "backend", "frontend", "cli",
-    "mobile", "data", "library", "other",
+    "mobile", "game", "data", "library", "other",
 ]
 ThemeT = Literal[
     "bootstrap", "features", "refinements", "refactor",
@@ -487,6 +487,7 @@ def _run_summary(lr: LoadedRun, lt: LoadedTest) -> dict:
         "quantization": lr.run.quantization,
         "contributor_url": lr.run.contributor_url,
         "contributor_handle": handle_from_url(lr.run.contributor_url),
+        "contributor_avatar": avatar_from_url(lr.run.contributor_url),
         "date": lr.run.date.isoformat(),
         "stages_run": len(lr.run.stages),
         "stages_total": len(lt.test.stages),
@@ -837,6 +838,17 @@ def build_hardware(loaded: dict[str, LoadedTest]) -> dict:
             continue
         first_hw = items[0][2]
         first_run = items[0][1].run
+        # Deduplicated contributors who submitted runs with this exact combo.
+        # Sorted by handle so output is stable across builds.
+        seen_urls: set[str] = set()
+        contribs: list[dict] = []
+        for _, lr, _ in items:
+            url = lr.run.contributor_url
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+            contribs.append({"url": url, "handle": handle_from_url(url)})
+        contribs.sort(key=lambda c: c["handle"])
         combo_rows.append({
             **_stage_perf(stages),
             "device":            first_hw.device,
@@ -848,7 +860,8 @@ def build_hardware(loaded: dict[str, LoadedTest]) -> dict:
             "ram_gb":            first_hw.ram_gb,
             "run_count":         len(items),
             "stage_count":       len(stages),
-            "contributor_count": len({lr.run.contributor_url for _, lr, _ in items}),
+            "contributor_count": len(contribs),
+            "contributors":      contribs,
         })
     # Rank by tokens/sec when available, otherwise by inverse avg duration.
     combo_rows.sort(
@@ -1164,6 +1177,7 @@ def _compact_run(r: dict) -> dict:
         "provider":           r["provider"],
         "contributor_handle": r["contributor_handle"],
         "contributor_url":    r["contributor_url"],
+        "contributor_avatar": r.get("contributor_avatar"),
         "date":               r["date"],
         "stages_run":         r["stages_run"],
         "stages_total":       r["stages_total"],
@@ -1214,7 +1228,27 @@ def _compact_catalog_row(r: dict) -> dict:
     }
 
 
+def _validate_via_cli() -> None:
+    """Run the CLI's `validate` command before any site work so a malformed
+    test.yaml / run.yaml fails the build with a clear, source-of-truth error
+    instead of being silently dropped by load_all()."""
+    cli = REPO_ROOT / "agent-arena-cli.py"
+    if not cli.is_file():
+        sys.stderr.write(f"\n[build_site] cannot find {cli}; skipping pre-build validate.\n")
+        return
+    print("→ Validating YAML via agent-arena-cli.py …", flush=True)
+    result = subprocess.run([str(cli), "validate"], cwd=REPO_ROOT)
+    if result.returncode != 0:
+        sys.stderr.write(
+            "\n[build_site] YAML validation failed (see errors above). "
+            "Fix them and re-run; the site will not be built until all "
+            "test.yaml / run.yaml files pass.\n"
+        )
+        sys.exit(result.returncode)
+
+
 def render(out_dir: Path, github_url: str, site_url: str) -> None:
+    _validate_via_cli()
     loaded = load_all()
     build_date = date.today().isoformat()
 
