@@ -1284,7 +1284,7 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
         rating_color=RATING_COLOR,
         run_yaml_example=(CONTRIBUTE_TPL_DIR / "run.yaml.example").read_text(encoding="utf-8").rstrip(),
         test_yaml_example=(CONTRIBUTE_TPL_DIR / "test.yaml.example").read_text(encoding="utf-8").rstrip(),
-        directory_tree=(CONTRIBUTE_TPL_DIR / "directory-tree.txt").read_text(encoding="utf-8").rstrip(),
+        directory_tree=(CONTRIBUTE_TPL_DIR / "directory-tree.txt.example").read_text(encoding="utf-8").rstrip(),
     )
 
     # ── index payload — always loaded by the SPA. Small, no per-run details. ──

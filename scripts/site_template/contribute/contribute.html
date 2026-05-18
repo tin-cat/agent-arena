@@ -7,18 +7,17 @@
      - rating_color         dict of rating → hex string
      - run_yaml_example     raw text of run.yaml.example
      - test_yaml_example    raw text of test.yaml.example
-     - directory_tree       raw text of directory-tree.txt
+     - directory_tree       raw text of directory-tree.txt.example
 #}
 <div class="contribute-page">
 
   {# ─── HERO ─── #}
   <section class="contrib-hero">
-    <div class="contrib-hero-eyebrow">▌ enter the arena</div>
     <h1 class="contrib-hero-title">step into the <span class="t-magenta-glow">arena</span>.</h1>
     <p class="contrib-hero-lead">Every model needs an opponent. Every run needs a recorder. Pick your weapon, run the gauntlet, and stamp your handle into the leaderboard for as long as silicon remembers.</p>
     <div class="contrib-hero-ctas">
-      <a class="cta cta-primary" href="#path-run-detail">⚔ add a run</a>
-      <a class="cta cta-magenta" href="#path-test-detail">✦ forge a new test</a>
+      <a class="cta cta-primary" href="#path-run-detail">+ run a test</a>
+      <a class="cta cta-magenta" href="#path-test-detail">+ create a new test</a>
       <a class="cta" href="{{ github_url }}" rel="noopener">⤴ fork on github</a>
     </div>
     <div class="contrib-hero-sigil" aria-hidden="true">
@@ -41,54 +40,53 @@
     <div class="oath-footer">⚔ for honor · for science · for the leaderboard ⚔</div>
   </section>
 
+  {# ─── TWO PATHS DIVERGE ─── #}
+  <section class="paths">
+    <a class="path-card" href="#path-run-detail">
+      <div class="path-tag">path 1 · ⚔</div>
+      <div class="path-name">run a test</div>
+      <div class="path-blurb">Run one of the existing tests in your AI coding setup and record the results.</div>
+      <div class="path-arrow">↓ jump to manual instructions</div>
+    </a>
+    <a class="path-card alt" href="#path-test-detail">
+      <div class="path-tag">path 2 · ✦</div>
+      <div class="path-name">create a new test</div>
+      <div class="path-blurb">Create a new coding test for others to run it on its setups.</div>
+      <div class="path-arrow">↓ jump to manual instructions</div>
+    </a>
+  </section>
+
   {# ─── QUICK START · CLI ─── #}
   <section class="panel">
     <div class="panel-head"><span class="panel-title">quick start · the cli</span><span class="panel-actions t-mute">recommended</span></div>
     <div class="panel-body">
-      <p>The fastest path. The script ships in the repo and bootstraps its own Python venv on first run (Python 3.11+ required).</p>
+      <p>The fastest path. Clone the repo and use the cli (Requires Python 3.11+)</p>
       <pre data-copy class="codeblock lang-sh" role="button" tabindex="0" aria-label="Copy code">git clone {{ git_clone_url }}
 cd agent-arena
 ./agent-arena-cli.py run add</pre>
       <div class="cli-grid">
         <div class="cli-row">
-          <span class="cli-kw">browse</span>
-          <span class="cli-cmd"><code>./agent-arena-cli.py browse</code></span>
-          <span class="cli-desc">TUI for tests, runs, and details</span>
-        </div>
-        <div class="cli-row">
           <span class="cli-kw">add run</span>
           <span class="cli-cmd"><code>./agent-arena-cli.py run add</code></span>
-          <span class="cli-desc">interactive run wizard</span>
+          <span class="cli-desc">Add a test run wizard</span>
         </div>
         <div class="cli-row">
           <span class="cli-kw">add test</span>
           <span class="cli-cmd"><code>./agent-arena-cli.py test add</code></span>
-          <span class="cli-desc">interactive new-test wizard</span>
+          <span class="cli-desc">Add a new test wizard</span>
         </div>
         <div class="cli-row">
           <span class="cli-kw">validate</span>
           <span class="cli-cmd"><code>./agent-arena-cli.py validate</code></span>
-          <span class="cli-desc">check yaml after manual edits</span>
+          <span class="cli-desc">Check yaml files after manual edits</span>
+        </div>
+        <div class="cli-row">
+          <span class="cli-kw">browse</span>
+          <span class="cli-cmd"><code>./agent-arena-cli.py browse</code></span>
+          <span class="cli-desc">TUI for browsing tests, runs, and details</span>
         </div>
       </div>
-      <p class="t-mute t-sm">Once your run is in, open a Pull Request against <code>main</code>. Your handle joins the leaderboard as soon as it's merged.</p>
     </div>
-  </section>
-
-  {# ─── TWO PATHS DIVERGE ─── #}
-  <section class="paths">
-    <a class="path-card" href="#path-run-detail">
-      <div class="path-tag">path 1 · ⚔</div>
-      <div class="path-name">add a run</div>
-      <div class="path-blurb">You picked an existing test. You ran it through your favorite agent. You have results. Record them.</div>
-      <div class="path-arrow">↓ jump to manual instructions</div>
-    </a>
-    <a class="path-card alt" href="#path-test-detail">
-      <div class="path-tag">path 2 · ✦</div>
-      <div class="path-name">forge a new test</div>
-      <div class="path-blurb">You have a fiendish multi-stage gauntlet in mind. Define it, drop it in, let others run it.</div>
-      <div class="path-arrow">↓ jump to manual instructions</div>
-    </a>
   </section>
 
   {# ─── PATH 1 · THE GAUNTLET ─── #}

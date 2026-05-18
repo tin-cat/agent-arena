@@ -1,15 +1,13 @@
 # Contributing
 
-The full contributor guide — the honor code, the CLI quickstart, the `run.yaml` and `test.yaml` schemas, the rating scale, and the worked examples — now lives on the site:
+The contributor guide, including `run.yaml` and `test.yaml` examples, is available on the site:
 
-### → **[agentarena.tin.cat/contribute](https://agentarena.tin.cat/contribute/)**
-
-That page is the source of truth. This file exists so GitHub's PR / issue templates still surface a "Contributing" link from the repo root.
+[![Contributing guide](https://img.shields.io/badge/➜%20See%20Contributing%20Guide-cyan?style=for-the-badge)](https://agentarena.tin.cat/contribute/)
 
 ## TL;DR
 
 1. **Fork** this repo and clone it.
-2. **Use the CLI** (Python 3.11+; bootstraps its own venv):
+2. **Use the CLI** (Python 3.11+ required):
    ```sh
    ./agent-arena-cli.py run add     # add a run of an existing test
    ./agent-arena-cli.py test add    # add a new test
