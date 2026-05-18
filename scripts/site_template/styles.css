@@ -377,7 +377,7 @@ tbody tr { transition: background .12s; }
 tbody tr:hover td { background: rgba(90,209,255,.05); }
 tbody tr.clickable { cursor: pointer; }
 tbody tr.clickable:hover td { background: rgba(90,209,255,.09); }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td .pill { vertical-align: middle; }
 .rank { color: var(--text-mute); width: 32px; font-variant-numeric: tabular-nums; }
 .rank.top { color: var(--magenta); font-weight: 700; }

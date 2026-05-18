@@ -504,7 +504,7 @@ const CATALOG_KINDS = {
     routeOther: 'providers',
     tag:        '06',
     title:      'coding agents',
-    lead:       'Per-agent breakdown of contributed runs, with the providers used alongside each.',
+    lead:       'Per-agent breakdown of activity, with the providers used alongside each and the tests covered.',
     crumb:      'agents',
     eyebrow:    'coding agent',
     countSing:  'agent',
@@ -519,7 +519,7 @@ const CATALOG_KINDS = {
     routeOther: 'agents',
     tag:        '07',
     title:      'inference providers',
-    lead:       'Per-provider breakdown of contributed runs, with the agents observed against each.',
+    lead:       'Per-provider breakdown of activity, with the agents observed against each and the tests covered.',
     crumb:      'providers',
     eyebrow:    'inference provider',
     countSing:  'provider',
@@ -615,10 +615,41 @@ function catalogDetailHTML(kind, d) {
     </div>
 
     <div class="panel">
-      <div class="panel-head"><span class="panel-title">contributed runs</span><span class="panel-actions t-mute">${d.runs.length} run${d.runs.length === 1 ? '' : 's'}</span></div>
-      <div class="panel-body dense">${runsTableHTML(d.runs, { showTest: true })}</div>
+      <div class="panel-head"><span class="panel-title">usage over time</span><span class="panel-actions t-mute">${d.activity.length} day${d.activity.length === 1 ? '' : 's'}</span></div>
+      <div class="panel-body">
+        ${d.activity.length
+          ? `<div class="chart-box"><canvas id="catalogActivityChart"></canvas></div>`
+          : '<div style="padding:14px;color:var(--text-mute)">no runs yet.</div>'}
+      </div>
     </div>
   `;
+}
+
+function mountCatalogActivity(activity) {
+  if (!activity || !activity.length) return;
+  makeChart('catalogActivityChart', {
+    type: 'line',
+    data: {
+      labels: activity.map((a) => a.date),
+      datasets: [{
+        data: activity.map((a) => a.count),
+        borderColor: '#5ad1ff',
+        backgroundColor: 'rgba(90,209,255,.15)',
+        borderWidth: 1.5,
+        fill: true, tension: .3,
+        pointRadius: 3, pointHoverRadius: 5,
+        pointBackgroundColor: '#ff6ad5',
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: COMMON_TOOLTIP },
+      scales: {
+        x: { ...COMMON_SCALES, ticks: { ...COMMON_SCALES.ticks, maxRotation: 0, autoSkipPadding: 14 } },
+        y: { ...COMMON_SCALES, beginAtZero: true, ticks: { ...COMMON_SCALES.ticks, precision: 0 } },
+      },
+    },
+  });
 }
 
 async function renderCatalog(kind, selectedId, gen) {
@@ -640,6 +671,7 @@ async function renderCatalog(kind, selectedId, gen) {
     if (isStale(gen)) return;
     const slot = $('#catalogDetailSlot');
     if (slot) slot.innerHTML = catalogDetailHTML(kind, detail);
+    mountCatalogActivity(detail.activity);
   } catch (err) {
     if (isStale(gen)) return;
     const slot = $('#catalogDetailSlot');

@@ -613,8 +613,11 @@ def _build_grouped(
                 lr = best_stages[0]
                 top_combo = f"{cross_fn(lr.run)} · {lr.run.model}"
 
-        run_summaries = [_run_summary(lr, lt) for lt, lr in items]
-        run_summaries.sort(key=lambda r: (r["avg_rating_score"] or 0), reverse=True)
+        # Per-day run counts → "usage over time" chart on the detail page.
+        by_date: dict[str, int] = defaultdict(int)
+        for _, lr in items:
+            by_date[lr.run.date.isoformat()] += 1
+        activity = [{"date": d, "count": c} for d, c in sorted(by_date.items())]
 
         out.append({
             "id":                 gid,
@@ -635,7 +638,7 @@ def _build_grouped(
             "top_combo":          top_combo,
             "cross":              cross_rows,
             "tests":              test_rows,
-            "runs":               run_summaries,
+            "activity":           activity,
         })
     out.sort(
         key=lambda r: (r["run_count"], r["stage_count"], r["avg_rating_score"] or 0),
@@ -1212,14 +1215,14 @@ def render(out_dir: Path, github_url: str) -> None:
             "runs": [_compact_run(r) for r in p["runs"]],
         })
 
-    # ── per-agent / per-provider detail (metadata + cross-ref + per-test + runs) ──
+    # ── per-agent / per-provider detail (metadata + cross-ref + per-test + activity) ──
     for a in per_agent:
         _write_json(out_dir / "agents" / f"{a['id']}.json", {
             **_compact_catalog_row(a),
             "homepage": a["homepage"],
             "cross":    a["cross"],     # providers used with this agent
             "tests":    a["tests"],
-            "runs":     [_compact_run(r) for r in a["runs"]],
+            "activity": a["activity"],
         })
     for p in per_provider:
         _write_json(out_dir / "providers" / f"{p['id']}.json", {
@@ -1227,7 +1230,7 @@ def render(out_dir: Path, github_url: str) -> None:
             "homepage": p["homepage"],
             "cross":    p["cross"],     # agents used with this provider
             "tests":    p["tests"],
-            "runs":     [_compact_run(r) for r in p["runs"]],
+            "activity": p["activity"],
         })
 
     # ── logo assets — mirror the /logos/ tree into the site output so the SPA
