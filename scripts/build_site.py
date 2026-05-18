@@ -1524,6 +1524,70 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
         encoding="utf-8",
     )
 
+    # ── llms.txt — site map for LLMs (llmstxt.org convention) ──
+    # Markdown index pointing at every meaningful canonical URL, grouped by
+    # kind, with a short description so an LLM crawler can decide what to
+    # fetch without parsing each HTML page.
+    def _line(title: str, path: str, desc: Optional[str] = None) -> str:
+        url = path if path.startswith(("http://", "https://")) else f"{site_url}{path}"
+        link = f"- [{title}]({url})"
+        return f"{link}: {desc}" if desc else link
+
+    llms_parts: list[str] = [
+        "# AgentArena",
+        "",
+        f"> {TAGLINE}.",
+        "",
+        ("AgentArena is a community-run, real-world benchmark of how agentic AI "
+         "coding setups perform on shared tasks. Each test defines an ordered "
+         "sequence of prompts; contributors run those prompts against their "
+         "preferred agent · model · provider stack and submit per-stage scores. "
+         "Aggregates roll up into a leaderboard, per-agent / per-provider / "
+         "per-model breakdowns, and per-contributor profiles."),
+        "",
+        f"Snapshot: {summary['tests']} tests · {summary['runs']} runs · "
+        f"{summary['stages']} stages · {summary['contributors']} contributors. "
+        f"Built {build_date}.",
+        "",
+        "## Project",
+        "",
+        _line("Overview",      "/",              "Project summary, top performers, latest activity."),
+        _line("Leaderboard",   "/leaderboard/",  "Agent · provider · model combinations ranked by average score."),
+        _line("Silicon beasts","/hardware/",     "Self-hosted rigs powering local inference — devices, GPUs, throughput."),
+        _line("Source & CONTRIBUTING.md", github_url, "How to contribute a new test or a new run."),
+        _line("Raw data dump (JSON)", "/stats.json", "Complete machine-readable dump of every aggregation."),
+        "",
+        "## Tests",
+        "",
+    ]
+    for t in per_test:
+        llms_parts.append(_line(t["title"], f"/tests/{t['name']}/", _trim(t["description"], 140)))
+
+    llms_parts += ["", "## Coding agents", ""]
+    for a in per_agent:
+        llms_parts.append(_line(a["name"], f"/agents/{a['id']}/",
+                                a.get("description") or f"{a['run_count']} run(s)."))
+
+    llms_parts += ["", "## Inference providers", ""]
+    for p in per_provider:
+        llms_parts.append(_line(p["name"], f"/providers/{p['id']}/",
+                                p.get("description") or f"{p['run_count']} run(s)."))
+
+    llms_parts += ["", "## Models", ""]
+    for m in per_model:
+        vendor = m.get("vendor_name")
+        desc = (f"by {vendor}. " if vendor else "") + f"{m['run_count']} run(s) across {m['test_count']} test(s)."
+        llms_parts.append(_line(m["name"], f"/models/{m['id']}/", desc))
+
+    llms_parts += ["", "## Contributors", ""]
+    for p in contributors["profiles"]:
+        desc = (f"{p['run_count']} run(s) across {p['test_count']} test(s)"
+                + (f", avg score {p['avg_rating_score']:.2f}." if p["avg_rating_score"] is not None else "."))
+        llms_parts.append(_line(p["handle"], f"/contributors/{p['handle']}/", desc))
+
+    llms_parts.append("")
+    (out_dir / "llms.txt").write_text("\n".join(llms_parts), encoding="utf-8")
+
     (out_dir / ".nojekyll").write_text("", encoding="utf-8")  # GitHub Pages: skip Jekyll
 
     n_tests = len(per_test)
@@ -1537,7 +1601,7 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
     # (each run is duplicated under runs/ and tests/.../runs/).
     n_html = 9 + n_tests + 2 * n_runs + n_contribs + n_agents + n_providers + n_models + 1  # +1 for 404
     print(f"✓ Wrote {n_html} HTML files (per-route shells + 404.html)")
-    print(f"✓ Wrote sitemap.xml ({len(sitemap_urls)} canonical URLs) + robots.txt")
+    print(f"✓ Wrote sitemap.xml ({len(sitemap_urls)} canonical URLs) + robots.txt + llms.txt")
     print(f"✓ Wrote app.js, styles.css, boot.js (boot payload {sizes['boot.js']:,} bytes)")
     print(f"✓ Wrote {out_dir / 'index.json'} ({sizes['index.json']:,} bytes)")
     print(f"✓ Wrote {out_dir / 'runs.json'} ({sizes['runs.json']:,} bytes)")
