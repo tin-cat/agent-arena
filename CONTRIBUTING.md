@@ -3,19 +3,14 @@ Please feel free to contribute your own tests and runs of existing tests to this
 
 Contributions should be submitted as a GitHub Pull Request against `main`: Fork the repo, add your run or test on a branch, push it to your fork, and open a PR.
 
----
-
-## ⚔ The contributor's code ⚔
-
-There is no referee in this arena. No anti-cheat watches your terminal. No tribunal reviews the tape. The leaderboard rests entirely on **your honor**.
-
-Run the stages exactly as written. Report the time, the costs, and the rating you actually got — be honest. *Especially* when your favorite stack stumbles. Your honest data is what helps the community.
-
-If you fake your way to the top, you might fool the board for a week. But the silicon knows. Your PR will be discarded in shame and preserved in the `git log` for history to know.
-
-We trust you. Don't make us regret it. *For honor. For science. For the leaderboard.*
-
----
+> [!INFO] ⚔ The contributor's code ⚔
+> There is no referee in this arena. No anti-cheat watches your terminal. No tribunal reviews the tape. The leaderboard rests entirely on **your honor**.
+>
+> Run the stages exactly as written. Report the time, the costs, and the rating you actually got. Be honest. *Especially* when your favorite stack stumbles. Your data is what helps the community.
+>
+> If you fake your way to the top, you might fool the board for a week. But the silicon knows. Your PR will be discarded in shame and preserved in the git log for history to know.
+>
+> We trust you. ⚔ *For honor. For science. For the leaderboard.* ⚔
 
 # The easiest way to contribute
 
@@ -25,40 +20,39 @@ Fork this repo and clone it:
 git clone https://github.com/tin-cat/agent-arena.git
 ```
 
-Then use the provided CLI _(Needs Python 3.11+)_:
+Then use the provided CLI _(Needs Python 3.11+; the script bootstraps its own venv on first run)_:
 
 ```sh
 # Browse current tests and runs
-scripts/cli.py browse
+./agent-arena-cli.py browse
 
 # Add your run of an existing test
-scripts/cli.py run add
+./agent-arena-cli.py run add
 
 # Add a new test for others to run (or add your own runs also)
-scripts/cli.py test add
+./agent-arena-cli.py test add
 ```
 
 Once you're finished, create a push request. Your contributions will be reviewed, and you'll get into the leaderboards as soon as they get accepted.
 
----
-
-You can also contribute tests and runs by adding the YAML files and directories manually, and run `scripts/cli.py validate` after any manual edit to check for errors before submitting. Here's how to do it:
+You can also contribute tests and runs by adding the YAML files and directories manually, and run `./agent-arena-cli.py validate` after any manual edit to check for errors before submitting. Here's how to do it:
 
 ## Manually contribute your run of an existing test
 
 1. Pick a test under `/tests/<test name>/`. Open its `test.yaml` to see the test description and each stage's prompt.
 
-2. For each stage, feed the prompt to the LLM **exactly as written**, in order. Each stage continues from the previous stage's output — don't start from a fresh codebase.
+2. For each stage, feed the prompt to the LLM **exactly as written**, in order. Each stage continues from the previous stage's output, don't start from a fresh codebase.
 
-3. Create a run directory at `/tests/<test name>/results/<run-id>/`. The run ID is a short, unique slug that makes your run easy to identify — typically `<your-github-username>-<agent>-<model>-<settings>`, e.g. `tin-cat-claude-code-sonnet-4.6-high-effort`. If you have multiple runs with the same configuration, append a suffix such as `-2` or a date.
+3. Create a run directory at `/tests/<test name>/results/<run-id>/`. The run ID is a short, unique slug that makes your run easy to identify, typically `<your-github-username>-<agent>-<model>-<settings>`, e.g. `tin-cat-claude-code-sonnet-4.6-high-effort`. If you have multiple runs with the same configuration, append a suffix such as `-2` or a date.
 
-4. Inside the run directory, place one subdirectory per stage you ran, named exactly like the stage `id` from `test.yaml` (e.g. `stage-1-first-run`). Put the complete source code the LLM produced for that stage inside — even if most of it is duplicated from earlier stages.
+4. Inside the run directory, place one subdirectory per stage you ran, named exactly like the stage `id` from `test.yaml` (e.g. `stage-1-first-run`). Put the complete source code the LLM produced for that stage inside, even if most of it is duplicated from earlier stages.
 
 5. Add a `run.yaml` manifest at the root of your run directory. See the schema below.
 
 ### `run.yaml` schema
 
-> **`contributor_url` is your identity.** It can be any URL that uniquely identifies you — your GitHub profile, personal site, Mastodon, X/Twitter, etc. The site uses this URL to group all your runs and tests together into a single contributor profile and to rank you on the contributors leaderboard. **Use the exact same `contributor_url` for every contribution you make**, otherwise your runs will get split across multiple "people" and your handle won't accumulate.
+> [!NOTE] contributor_url is your unique ID
+Always use the exact same URL so the leaderboard can group your runs and accumulate your ranking. If you use your GitHub profile URL, your GitHub profile image will automatically display on the leaderboard.
 
 ```yaml
 contributor_url: https://github.com/your-username   # see the note above — must match across all your contributions
@@ -132,7 +126,8 @@ If your github username were `anthony` and you ran the first two stages of the `
 
 ### `test.yaml` schema
 
-> **`contributor_url` identifies you as the test's author**, the same way it does for runs. The site uses it to credit the test on its detail page, list it under your contributor profile, and group all your contributions together. Use the exact same URL across every run and test you contribute.
+> [!NOTE] contributor_url is your unique ID
+Always use the exact same URL so the leaderboard can group your runs and accumulate your ranking. If you use your GitHub profile URL, your GitHub profile image will automatically display on the leaderboard.
 
 ```yaml
 contributor_url: https://github.com/your-username   # see the note above — must match across all your contributions

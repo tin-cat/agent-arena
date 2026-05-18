@@ -3,15 +3,13 @@
 # AgentArena
 **A community benchmark for AI coding agent performance**
 
-[➜ See current test results](https://agentarena.tin.cat)
+[![Test Results](https://img.shields.io/badge/➜%20See%20Current%20test%20results-cyan?style=for-the-badge)](https://agentarena.tin.cat)
 
 Pick your favorite AI coding setup: agent, model, provider or your own self-hosted rig if you're feeling spicy. Run one of the tests, and send a PR with the results. Your handle goes on the [leaderboard](https://agentarena.tin.cat). Your rig joins the silicon beasts roster.
 
 Each test is a multi-stage gauntlet: an unattended first build, then progressively harder refinements. Setups that one-shot the easy stuff but fall apart on follow-up work get exposed.
 
 The leaderboard is fun, but the goal is real: a community-run, real-world view of how agentic AI coding setups *actually* perform on tasks they'll be asked to do: the kind of comparison vendor benchmarks rarely give you. Cloud vs. self-hosted, frontier vs. open-weight, high-effort vs. fast — all on the same prompts, on the same scale.
-
----
 
 ## Tests structure
 
@@ -41,30 +39,34 @@ Each run directory is flat — its `run.yaml` carries all the metadata (contribu
 
 ## Browse with the CLI
 
-The repository ships with a small CLI at `scripts/cli.py` for exploring tests and runs from the command line. It also handles the boilerplate for adding new tests or runs interactively, and can validate any manual YAML edits.
+The repository ships with a single-file CLI, `agent-arena-cli.py`, for exploring tests and runs from the command line. It also handles the boilerplate for adding new tests or runs interactively, and can validate any manual YAML edits.
 
-You only need Python 3.11+. The script bootstraps its own dependencies into `scripts/.venv/` on first run (gitignored); subsequent runs are instant.
+You only need Python 3.11+. The script bootstraps its own dependencies into `./.venv/` on first run (gitignored); subsequent runs are instant.
 
 ```sh
 # Browse
-scripts/cli.py browse                          # full TUI for tests, runs, and their details
+./agent-arena-cli.py browse                    # full TUI for tests, runs, and their details
 
 # Add (interactive)
-scripts/cli.py run add                         # record a new run
-scripts/cli.py test add                        # create a new test
+./agent-arena-cli.py run add                   # record a new run
+./agent-arena-cli.py test add                  # create a new test
 
 # Validate
-scripts/cli.py validate                        # check all yaml files against the schema
+./agent-arena-cli.py validate                  # check all yaml files against the schema
 ```
 
-Run `scripts/cli.py --help` for the full command list. On Windows, invoke with `python scripts/cli.py …` since the shebang isn't honored.
+Run `./agent-arena-cli.py --help` for the full command list.
 
----
+### On Windows
+
+- **Command Prompt:** `agent-arena-cli.py browse`
+- **PowerShell:** `.\agent-arena-cli.py browse`
+- **Git Bash / WSL:** `./agent-arena-cli.py browse`
+
+You can always invoke Python directly with `py agent-arena-cli.py …` or `python agent-arena-cli.py …`.
 
 ## Contribute
 Please feel free to contribute your tests to this repository. You can either contribute entire new tests, or your runs of existing tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
----
-
 ## About
-Reach me at [@lorenzoherrera](https://twitter.com/lorenzoherrera)
+Reach me at [@lorenzoherrera](https://twitter.com/lorenzoherrera) ❤️ [tin.cat](https://tin.cat)
