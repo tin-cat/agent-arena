@@ -122,6 +122,7 @@ const loadRun         = (t, id)    => loadJSON(`runs/${encodeURIComponent(t)}/${
 const loadContributor = (handle)   => loadJSON(`contributors/${encodeURIComponent(handle)}.json`);
 const loadAgent       = (id)       => loadJSON(`agents/${encodeURIComponent(id)}.json`);
 const loadProvider    = (id)       => loadJSON(`providers/${encodeURIComponent(id)}.json`);
+const loadModel       = (id)       => loadJSON(`models/${encodeURIComponent(id)}.json`);
 
 const SKELETON = `<div class="panel"><div class="panel-body t-mute">loading…</div></div>`;
 
@@ -155,6 +156,8 @@ const routes = [
   { pat: /^\/agents\/([^/]+)$/,                         name: 'agents',       handler: (m, gen) => renderAgents(decodeURIComponent(m[1]), gen) },
   { pat: /^\/providers$/,                               name: 'providers',    handler: (_m, gen) => renderProviders(null, gen) },
   { pat: /^\/providers\/([^/]+)$/,                      name: 'providers',    handler: (m, gen) => renderProviders(decodeURIComponent(m[1]), gen) },
+  { pat: /^\/models$/,                                  name: 'models',       handler: (_m, gen) => renderModels(null, gen) },
+  { pat: /^\/models\/([^/]+)$/,                         name: 'models',       handler: (m, gen) => renderModels(decodeURIComponent(m[1]), gen) },
   { pat: /^\/hardware$/,                                name: 'hardware',     handler: (_m, gen) => renderHardware(gen) },
 ];
 
@@ -502,7 +505,7 @@ const CATALOG_KINDS = {
     load:       (id) => loadAgent(id),
     route:      'agents',
     routeOther: 'providers',
-    tag:        '06',
+    tag:        '07',
     title:      'coding agents',
     lead:       'Per-agent breakdown of activity, with the providers used alongside each and the tests covered.',
     crumb:      'agents',
@@ -511,13 +514,14 @@ const CATALOG_KINDS = {
     countPlur:  'agents',
     crossLabel: 'providers used',
     crossKey:   'provider',
+    hasCatalog: true,
   },
   providers: {
     list:       () => DATA.providers || [],
     load:       (id) => loadProvider(id),
     route:      'providers',
     routeOther: 'agents',
-    tag:        '07',
+    tag:        '08',
     title:      'inference providers',
     lead:       'Per-provider breakdown of activity, with the agents observed against each and the tests covered.',
     crumb:      'providers',
@@ -526,13 +530,32 @@ const CATALOG_KINDS = {
     countPlur:  'providers',
     crossLabel: 'agents used',
     crossKey:   'agent',
+    hasCatalog: true,
+  },
+  models: {
+    list:       () => DATA.models || [],
+    load:       (id) => loadModel(id),
+    route:      'models',
+    routeOther: 'providers',
+    tag:        '09',
+    title:      'models',
+    lead:       'Per-model breakdown of activity, with the providers serving each and the tests covered.',
+    crumb:      'models',
+    eyebrow:    'model',
+    countSing:  'model',
+    countPlur:  'models',
+    crossLabel: 'providers serving',
+    crossKey:   'provider',
+    // Models intentionally have no catalog JSON — they change too often and
+    // names are too unpredictable — so the "unlisted" hint doesn't apply.
+    hasCatalog: false,
   },
 };
 
 function catalogTabHTML(kind, item, isActive) {
   return `<a class="catalog-tab ${isActive ? 'active' : ''}" href="#/${kind.route}/${encodeURIComponent(item.id)}">
     <div class="catalog-tab-head">
-      <div class="catalog-tab-name">${esc(item.name || item.id)}${!item.in_catalog ? ' <span class="pill muted">unlisted</span>' : ''}</div>
+      <div class="catalog-tab-name">${esc(item.name || item.id)}${kind.hasCatalog && !item.in_catalog ? ' <span class="pill muted">unlisted</span>' : ''}</div>
       ${item.category ? `<div class="catalog-tab-type">${esc(item.category)}</div>` : ''}
     </div>
     <div class="catalog-tab-badges">
@@ -582,9 +605,10 @@ function catalogDetailHTML(kind, d) {
         ${d.description ? `<p class="catalog-hero-desc t-mute">${esc(d.description)}</p>` : ''}
         <div class="catalog-hero-meta">
           ${d.category ? `<span class="pill">${esc(d.category)}</span>` : ''}
+          ${d.vendor_name ? `<span class="pill">by ${esc(d.vendor_name)}</span>` : ''}
           <span class="pill muted">id: ${esc(d.id)}</span>
           ${d.homepage ? `<a class="profile-link" href="${esc(d.homepage)}" rel="noopener">${esc(d.homepage)}</a>` : ''}
-          ${!d.in_catalog ? `<span class="pill muted">unlisted — add to /${esc(kind.route)}.json</span>` : ''}
+          ${kind.hasCatalog && !d.in_catalog ? `<span class="pill muted">unlisted — add to /${esc(kind.route)}.json</span>` : ''}
         </div>
         ${d.top_combo ? `<div class="profile-meta">top combo: <b>${esc(d.top_combo)}</b></div>` : ''}
       </div>
@@ -681,6 +705,7 @@ async function renderCatalog(kind, selectedId, gen) {
 
 const renderAgents    = (id, gen) => renderCatalog(CATALOG_KINDS.agents, id, gen);
 const renderProviders = (id, gen) => renderCatalog(CATALOG_KINDS.providers, id, gen);
+const renderModels    = (id, gen) => renderCatalog(CATALOG_KINDS.models, id, gen);
 
 function runsTableHTML(runs, opts = {}) {
   const { showTest = true, linkBase = '#/runs/' } = opts;
@@ -1072,7 +1097,7 @@ function renderHardware() {
   const hd = h.headline;
 
   view().innerHTML = `
-    ${viewHead('silicon beasts', '08', 'A roll-call of the self-hosted rigs powering local inference in this benchmark. Speed, hardware, and the contributors who threw silicon at the problem.')}
+    ${viewHead('silicon beasts', '06', 'A roll-call of the self-hosted rigs powering local inference in this benchmark. Speed, hardware, and the contributors who threw silicon at the problem.')}
 
     ${hd.runs === 0 ? `
       <div class="panel"><div class="panel-body t-mute">No self-hosted runs yet — contribute one to launch this section.</div></div>

@@ -119,6 +119,7 @@ _bootstrap()
 
 import argparse
 import json
+import re
 import shutil
 import typing
 from collections import defaultdict
@@ -542,15 +543,21 @@ def _build_grouped(
     *,
     self_key: str,
     cross_key: str,
+    top_combo_fn=None,
 ) -> list[dict]:
-    """Shared aggregator used by build_per_agent and build_per_provider.
+    """Shared aggregator used by build_per_agent, build_per_provider, build_per_model.
 
     `key_fn(run) -> str` picks the grouping id (e.g. agent name or provider).
     `cross_fn(run) -> str` picks the cross-reference id for the table on the
     detail page (the other axis). `catalog` adds display metadata when the id
     is in /agents.json or /providers.json; ids missing from the catalog still
     get a row (using the raw id as the display name).
+    `top_combo_fn(run) -> str` produces the "top combo" headline. Defaults to
+    "<cross> · <model>", which is right for agents/providers but redundant for
+    models (the model is the thing being described); models override it.
     """
+    if top_combo_fn is None:
+        top_combo_fn = lambda r: f"{cross_fn(r)} · {r.model}"
     groups: dict[str, list[tuple[LoadedTest, LoadedRun]]] = defaultdict(list)
     for lt in loaded.values():
         for lr in lt.runs:
@@ -611,7 +618,7 @@ def _build_grouped(
                     best_stages = [lr]
             if best_stages:
                 lr = best_stages[0]
-                top_combo = f"{cross_fn(lr.run)} · {lr.run.model}"
+                top_combo = top_combo_fn(lr.run)
 
         # Per-day run counts → "usage over time" chart on the detail page.
         by_date: dict[str, int] = defaultdict(int)
@@ -672,6 +679,73 @@ def build_per_provider(loaded: dict[str, LoadedTest], catalog: dict[str, dict]) 
         self_key="provider",
         cross_key="agent",
     )
+
+
+def _slug_model(model_id: str) -> str:
+    """URL-and-filename-safe identifier for a model. Hugging Face uses
+    'org/repo' paths which would otherwise create unwanted subdirectories
+    when used as a file name and break a single-segment URL route."""
+    return model_id.replace("/", "__")
+
+
+# Heuristic: map model id prefixes to the lab that made the model. We don't
+# maintain a full catalog (models churn too fast) but a handful of well-known
+# families can be detected from the id alone. When a match exists and the
+# referenced logo file is in /logos/, we point the model's `logo` field at it
+# so the hero shows the lab's mark; otherwise just the display name is set
+# (for the "by <vendor>" chip) and the SPA falls back to a first-letter tile.
+_VENDOR_PATTERNS: list[tuple[re.Pattern, str, Optional[str]]] = [
+    (re.compile(r"^(claude|sonnet|opus|haiku)",  re.I), "Anthropic", "/logos/providers/anthropic.svg"),
+    (re.compile(r"^(gpt-|o[3-9])",                re.I), "OpenAI",    None),
+    (re.compile(r"^gemini",                       re.I), "Google",    "/logos/providers/gemini.svg"),
+    (re.compile(r"^grok",                         re.I), "xAI",       "/logos/providers/xai.svg"),
+    (re.compile(r"^deepseek",                     re.I), "DeepSeek",  "/logos/providers/deepseek.svg"),
+    (re.compile(r"^(qwen|Qwen/)",                 re.I), "Qwen",      "/logos/agents/qwen-code.svg"),
+    (re.compile(r"^(llama|meta-llama/)",          re.I), "Meta",      None),
+    (re.compile(r"^(mistral|mixtral|mistralai/)", re.I), "Mistral",   "/logos/providers/mistral.svg"),
+]
+
+
+def _infer_vendor(model_id: str) -> tuple[Optional[str], Optional[str]]:
+    """Return (vendor_display_name, logo_path) for a model id, or (None, None)
+    when no pattern matches."""
+    for pattern, name, logo in _VENDOR_PATTERNS:
+        if pattern.search(model_id):
+            return name, logo
+    return None, None
+
+
+def build_per_model(loaded: dict[str, LoadedTest]) -> list[dict]:
+    """One entry per model identifier used in any run. No catalog file
+    backs this (models are too volatile to maintain a fixed list); display
+    metadata is left empty and the SPA falls back to the raw id and
+    first-letter logo."""
+    rows = _build_grouped(
+        loaded,
+        key_fn=lambda r: r.model,
+        cross_fn=lambda r: r.provider,
+        catalog={},
+        self_key="model",
+        cross_key="provider",
+        # For a model's "top combo" the cross-axis already implies the model;
+        # show provider · agent instead so the headline is informative.
+        top_combo_fn=lambda r: f"{r.provider} · {r.agent.name}",
+    )
+    # The raw id (possibly an HF "org/repo" path) is what we want to display;
+    # the URL-safe slug is what we want to route to and write as a filename.
+    # We also try to infer the model's vendor (lab that made it) from the id
+    # prefix — when it matches, the SPA shows a "by <vendor>" chip and points
+    # the logo at the lab's existing brand mark.
+    for row in rows:
+        original = row["id"]
+        row["name"] = original
+        row["id"] = _slug_model(original)
+        row["model"] = original
+        vendor_name, vendor_logo = _infer_vendor(original)
+        row["vendor_name"] = vendor_name
+        if vendor_logo:
+            row["logo"] = vendor_logo
+    return rows
 
 
 def build_all_runs(loaded: dict[str, LoadedTest]) -> list[dict]:
@@ -1154,6 +1228,7 @@ def render(out_dir: Path, github_url: str) -> None:
     per_test     = build_per_test(loaded)
     per_agent    = build_per_agent(loaded, agents_catalog)
     per_provider = build_per_provider(loaded, providers_catalog)
+    per_model    = build_per_model(loaded)
     all_runs     = build_all_runs(loaded)
     contributors = build_contributors(loaded)
     activity     = build_activity(loaded)
@@ -1175,6 +1250,7 @@ def render(out_dir: Path, github_url: str) -> None:
         "tests":        [_compact_test(t) for t in per_test],
         "agents":       [_compact_catalog_row(a) for a in per_agent],
         "providers":    [_compact_catalog_row(p) for p in per_provider],
+        "models":       [_compact_catalog_row(m) for m in per_model],
         "contributors": {
             "profiles": [_compact_profile(p) for p in contributors["profiles"]],
             "recent":   contributors["recent"],
@@ -1232,6 +1308,15 @@ def render(out_dir: Path, github_url: str) -> None:
             "tests":    p["tests"],
             "activity": p["activity"],
         })
+    for m in per_model:
+        _write_json(out_dir / "models" / f"{m['id']}.json", {
+            **_compact_catalog_row(m),
+            "homepage":    m.get("homepage"),
+            "vendor_name": m.get("vendor_name"),
+            "cross":       m["cross"],   # providers serving this model
+            "tests":       m["tests"],
+            "activity":    m["activity"],
+        })
 
     # ── logo assets — mirror the /logos/ tree into the site output so the SPA
     # can fetch each entry's logo at /logos/<kind>/<id>.svg. Missing files just
@@ -1255,6 +1340,7 @@ def render(out_dir: Path, github_url: str) -> None:
         "tests":        per_test,
         "agents":       per_agent,
         "providers":    per_provider,
+        "models":       per_model,
         "contributors": contributors,
     })
 
@@ -1282,11 +1368,12 @@ def render(out_dir: Path, github_url: str) -> None:
     n_contribs = len(contributors["profiles"])
     n_agents = len(per_agent)
     n_providers = len(per_provider)
+    n_models = len(per_model)
     print(f"✓ Wrote {out_dir / 'index.html'} ({sizes['index.html']:,} bytes)")
     print(f"✓ Wrote {out_dir / 'index.json'} ({sizes['index.json']:,} bytes — boot payload)")
     print(f"✓ Wrote {out_dir / 'runs.json'} ({sizes['runs.json']:,} bytes — runs tab)")
     print(f"✓ Wrote {n_tests} tests/, {n_runs} runs/, {n_contribs} contributors/, "
-          f"{n_agents} agents/, {n_providers} providers/ shards")
+          f"{n_agents} agents/, {n_providers} providers/, {n_models} models/ shards")
     print(f"  {summary['tests']} tests · {summary['runs']} runs · "
           f"{summary['stages']} stages · {summary['contributors']} contributors")
     print(f"  Local preview: python3 -m http.server -d {out_dir} 8000  →  http://localhost:8000")
