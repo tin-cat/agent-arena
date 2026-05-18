@@ -7,7 +7,7 @@
 // can be cached separately across the now-many per-route HTML files.
 const DATA = window.DATA || {};
 const RATING_COLOR = DATA.rating_color || {
-  excellent: '#34d399', good: '#a7f3d0', partial: '#fbbf24', failed: '#f87171',
+  excellent: '#34d399', good: '#7dd3fc', partial: '#fbbf24', failed: '#f87171',
 };
 const RATING_SCORE = DATA.rating_score || { excellent: 1, good: 0.75, partial: 0.4, failed: 0 };
 const FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -1454,33 +1454,46 @@ function mountTestThemeChart(test) {
 }
 
 function mountRunStageChart(run, test) {
-  // line of rating-score across stages (0..1)
-  const labels = run.stages.map((s) => s.id);
-  const data = run.stages.map((s) => RATING_SCORE[s.rating] ?? 0);
+  // Gantt-style horizontal timeline: one stacked bar segment per stage,
+  // segment width = duration_sec (or equal if unrecorded), fill = rating color.
+  const stages = run.stages;
+  const totalDur = stages.reduce((a, s) => a + (s.duration_sec || 0), 0);
+  const useDur = totalDur > 0;
+  const datasets = stages.map((s, i) => ({
+    label: `${String(i + 1).padStart(2, '0')} · ${s.id}`,
+    data: [useDur ? (s.duration_sec || 0) : 1],
+    backgroundColor: RATING_COLOR[s.rating],
+    borderColor: '#0d121b',
+    borderWidth: 2,
+    borderRadius: 2,
+    barPercentage: 0.85,
+    categoryPercentage: 1.0,
+  }));
   makeChart('runStageChart', {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data, borderColor: '#5ad1ff', backgroundColor: 'rgba(90,209,255,.18)',
-        borderWidth: 2, fill: true, tension: .25,
-        pointBackgroundColor: run.stages.map((s) => RATING_COLOR[s.rating]),
-        pointBorderColor: '#0d121b', pointBorderWidth: 1.5,
-        pointRadius: 6, pointHoverRadius: 8,
-      }],
-    },
+    type: 'bar',
+    data: { labels: ['timeline'], datasets },
     options: {
+      indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: { ...COMMON_TOOLTIP, callbacks: {
-          title: (items) => labels[items[0].dataIndex],
-          label: (ctx) => `${run.stages[ctx.dataIndex].rating} · score ${ctx.raw.toFixed(2)}`,
+          title: (items) => stages[items[0].datasetIndex].id,
+          label: (ctx) => {
+            const s = stages[ctx.datasetIndex];
+            const score = (RATING_SCORE[s.rating] ?? 0).toFixed(2);
+            return [
+              `${s.rating} · score ${score}`,
+              useDur ? fmtDuration(s.duration_sec || 0) : 'duration unrecorded',
+            ];
+          },
         } },
       },
       scales: {
-        x: COMMON_SCALES,
-        y: { ...COMMON_SCALES, min: 0, max: 1 },
+        x: { ...COMMON_SCALES, stacked: true,
+          ticks: useDur ? { ...COMMON_SCALES.ticks, callback: (v) => fmtDuration(v) } : { display: false },
+          grid: useDur ? COMMON_SCALES.grid : { display: false } },
+        y: { ...COMMON_SCALES, stacked: true, display: false },
       },
     },
   });

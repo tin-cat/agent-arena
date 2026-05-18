@@ -146,7 +146,7 @@ RATINGS = ("excellent", "good", "partial", "failed")
 RATING_SCORE = {"excellent": 1.0, "good": 0.75, "partial": 0.4, "failed": 0.0}
 RATING_COLOR = {
     "excellent": "#34d399",   # emerald-400
-    "good":      "#a7f3d0",   # emerald-200
+    "good":      "#7dd3fc",   # sky-300
     "partial":   "#fbbf24",   # amber-400
     "failed":    "#f87171",   # red-400
 }
