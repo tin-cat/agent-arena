@@ -119,6 +119,7 @@ _bootstrap()
 
 import argparse
 import json
+import shutil
 import typing
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -293,6 +294,26 @@ def load_all() -> dict[str, LoadedTest]:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+
+
+def load_catalog(filename: str) -> dict[str, dict]:
+    """Read a repo-root catalog file (agents.json or providers.json) and return
+    a dict keyed by `id`. Each value carries the entry's display metadata
+    (name, description, homepage, category, logo) for the site to render."""
+    path = REPO_ROOT / filename
+    if not path.is_file():
+        _warn(f"missing catalog {filename}; entries will have no metadata")
+        return {}
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        _warn(f"{filename}: invalid JSON: {e}")
+        return {}
+    out: dict[str, dict] = {}
+    for entry in entries:
+        if isinstance(entry, dict) and "id" in entry:
+            out[entry["id"]] = entry
+    return out
 
 
 def handle_from_url(url: str) -> str:
@@ -511,6 +532,143 @@ def build_per_test(loaded: dict[str, LoadedTest]) -> list[dict]:
             "runs": run_summaries,
         })
     return out
+
+
+def _build_grouped(
+    loaded: dict[str, LoadedTest],
+    key_fn,
+    cross_fn,
+    catalog: dict[str, dict],
+    *,
+    self_key: str,
+    cross_key: str,
+) -> list[dict]:
+    """Shared aggregator used by build_per_agent and build_per_provider.
+
+    `key_fn(run) -> str` picks the grouping id (e.g. agent name or provider).
+    `cross_fn(run) -> str` picks the cross-reference id for the table on the
+    detail page (the other axis). `catalog` adds display metadata when the id
+    is in /agents.json or /providers.json; ids missing from the catalog still
+    get a row (using the raw id as the display name).
+    """
+    groups: dict[str, list[tuple[LoadedTest, LoadedRun]]] = defaultdict(list)
+    for lt in loaded.values():
+        for lr in lt.runs:
+            groups[key_fn(lr.run)].append((lt, lr))
+
+    out: list[dict] = []
+    for gid, items in groups.items():
+        meta = catalog.get(gid, {})
+        all_stages = [s for _, lr in items for s in lr.run.stages]
+
+        # Cross-reference rollup: counts and top score for each "other axis" id
+        # encountered among this group's runs.
+        cross: dict[str, dict] = defaultdict(lambda: {"run_count": 0, "stages": []})
+        for lt, lr in items:
+            cid = cross_fn(lr.run)
+            cross[cid]["run_count"] += 1
+            cross[cid]["stages"].extend(lr.run.stages)
+        cross_rows = [
+            {
+                cross_key:          cid,
+                "run_count":        cell["run_count"],
+                "stage_count":      len(cell["stages"]),
+                "avg_rating_score": rating_score(cell["stages"]),
+            }
+            for cid, cell in cross.items()
+        ]
+        cross_rows.sort(key=lambda r: (r["avg_rating_score"] or 0, r["run_count"]), reverse=True)
+
+        # Per-test rollup: one row per test this agent/provider has runs against.
+        tests: dict[str, dict] = defaultdict(lambda: {"run_count": 0, "stages": [], "title": ""})
+        for lt, lr in items:
+            cell = tests[lt.test.name]
+            cell["run_count"] += 1
+            cell["stages"].extend(lr.run.stages)
+            cell["title"] = lt.test.title
+        test_rows = [
+            {
+                "test_name":        name,
+                "test_title":       cell["title"],
+                "run_count":        cell["run_count"],
+                "stage_count":      len(cell["stages"]),
+                "avg_rating_score": rating_score(cell["stages"]),
+            }
+            for name, cell in tests.items()
+        ]
+        test_rows.sort(key=lambda r: (r["avg_rating_score"] or 0, r["run_count"]), reverse=True)
+
+        # Pick a "top combo" headline — best-scoring cross-axis paired with the
+        # most-used model among this group's runs.
+        top_combo = None
+        if items:
+            best_stages: list[RunStage] = []
+            best_score = -1.0
+            for lt, lr in items:
+                s = rating_score(lr.run.stages) or 0
+                if s > best_score:
+                    best_score = s
+                    best_stages = [lr]
+            if best_stages:
+                lr = best_stages[0]
+                top_combo = f"{cross_fn(lr.run)} · {lr.run.model}"
+
+        run_summaries = [_run_summary(lr, lt) for lt, lr in items]
+        run_summaries.sort(key=lambda r: (r["avg_rating_score"] or 0), reverse=True)
+
+        out.append({
+            "id":                 gid,
+            self_key:             gid,                              # convenience alias for the SPA
+            "name":               meta.get("name") or gid,
+            "description":        meta.get("description"),
+            "homepage":           meta.get("homepage"),
+            "category":           meta.get("category"),
+            "logo":               meta.get("logo"),
+            "in_catalog":         gid in catalog,
+            "run_count":          len(items),
+            "stage_count":        len(all_stages),
+            "test_count":         len({lt.test.name for lt, _ in items}),
+            "contributor_count":  len({lr.run.contributor_url for _, lr in items}),
+            "avg_rating_score":   rating_score(all_stages),
+            "total_cost_usd":     total_cost(all_stages),
+            "total_duration_sec": sum(s.duration_sec for s in all_stages),
+            "top_combo":          top_combo,
+            "cross":              cross_rows,
+            "tests":              test_rows,
+            "runs":               run_summaries,
+        })
+    out.sort(
+        key=lambda r: (r["run_count"], r["stage_count"], r["avg_rating_score"] or 0),
+        reverse=True,
+    )
+    return out
+
+
+def build_per_agent(loaded: dict[str, LoadedTest], catalog: dict[str, dict]) -> list[dict]:
+    """One entry per coding agent used in any run. Each entry carries summary
+    stats, a cross-reference of providers used with this agent, the tests it
+    has runs against, and the full ranked run list."""
+    return _build_grouped(
+        loaded,
+        key_fn=lambda r: r.agent.name,
+        cross_fn=lambda r: r.provider,
+        catalog=catalog,
+        self_key="agent",
+        cross_key="provider",
+    )
+
+
+def build_per_provider(loaded: dict[str, LoadedTest], catalog: dict[str, dict]) -> list[dict]:
+    """One entry per inference provider used in any run. Mirror of
+    build_per_agent — cross-reference is which agents have been used here."""
+    return _build_grouped(
+        loaded,
+        key_fn=lambda r: r.provider,
+        cross_fn=lambda r: r.agent.name,
+        catalog=catalog,
+        self_key="provider",
+        cross_key="agent",
+    )
 
 
 def build_all_runs(loaded: dict[str, LoadedTest]) -> list[dict]:
@@ -958,15 +1116,41 @@ def _compact_profile(p: dict) -> dict:
     return {k: v for k, v in p.items() if k != "runs"}
 
 
+def _compact_catalog_row(r: dict) -> dict:
+    """Trim a per-agent / per-provider entry down to the listing-row payload.
+    Drops the runs/cross/tests detail tables — those are loaded lazily."""
+    return {
+        "id":                 r["id"],
+        "name":               r["name"],
+        "description":        r["description"],
+        "category":           r["category"],
+        "logo":               r["logo"],
+        "in_catalog":         r["in_catalog"],
+        "run_count":          r["run_count"],
+        "stage_count":        r["stage_count"],
+        "test_count":         r["test_count"],
+        "contributor_count":  r["contributor_count"],
+        "avg_rating_score":   r["avg_rating_score"],
+        "total_cost_usd":     r["total_cost_usd"],
+        "total_duration_sec": r["total_duration_sec"],
+        "top_combo":          r["top_combo"],
+    }
+
+
 def render(out_dir: Path, github_url: str) -> None:
     loaded = load_all()
     build_date = date.today().isoformat()
+
+    agents_catalog    = load_catalog("agents.json")
+    providers_catalog = load_catalog("providers.json")
 
     summary      = build_summary(loaded)
     leaderboard  = build_leaderboard(loaded)
     scatter      = build_scatter(loaded)
     theme_stats  = build_theme_stats(loaded)
     per_test     = build_per_test(loaded)
+    per_agent    = build_per_agent(loaded, agents_catalog)
+    per_provider = build_per_provider(loaded, providers_catalog)
     all_runs     = build_all_runs(loaded)
     contributors = build_contributors(loaded)
     activity     = build_activity(loaded)
@@ -986,6 +1170,8 @@ def render(out_dir: Path, github_url: str) -> None:
         "activity":     activity,
         "hardware":     hardware,
         "tests":        [_compact_test(t) for t in per_test],
+        "agents":       [_compact_catalog_row(a) for a in per_agent],
+        "providers":    [_compact_catalog_row(p) for p in per_provider],
         "contributors": {
             "profiles": [_compact_profile(p) for p in contributors["profiles"]],
             "recent":   contributors["recent"],
@@ -1026,6 +1212,33 @@ def render(out_dir: Path, github_url: str) -> None:
             "runs": [_compact_run(r) for r in p["runs"]],
         })
 
+    # ── per-agent / per-provider detail (metadata + cross-ref + per-test + runs) ──
+    for a in per_agent:
+        _write_json(out_dir / "agents" / f"{a['id']}.json", {
+            **_compact_catalog_row(a),
+            "homepage": a["homepage"],
+            "cross":    a["cross"],     # providers used with this agent
+            "tests":    a["tests"],
+            "runs":     [_compact_run(r) for r in a["runs"]],
+        })
+    for p in per_provider:
+        _write_json(out_dir / "providers" / f"{p['id']}.json", {
+            **_compact_catalog_row(p),
+            "homepage": p["homepage"],
+            "cross":    p["cross"],     # agents used with this provider
+            "tests":    p["tests"],
+            "runs":     [_compact_run(r) for r in p["runs"]],
+        })
+
+    # ── logo assets — mirror the /logos/ tree into the site output so the SPA
+    # can fetch each entry's logo at /logos/<kind>/<id>.svg. Missing files just
+    # 404; the SPA falls back to a placeholder. ──
+    src_logos = REPO_ROOT / "logos"
+    dst_logos = out_dir / "logos"
+    if src_logos.is_dir():
+        shutil.rmtree(dst_logos, ignore_errors=True)
+        shutil.copytree(src_logos, dst_logos)
+
     # ── stats.json — full dump for raw data access (not fetched by the SPA) ──
     sizes["stats.json"] = _write_json(out_dir / "stats.json", {
         "generated_at": build_date,
@@ -1037,6 +1250,8 @@ def render(out_dir: Path, github_url: str) -> None:
         "hardware":     hardware,
         "all_runs":     all_runs,
         "tests":        per_test,
+        "agents":       per_agent,
+        "providers":    per_provider,
         "contributors": contributors,
     })
 
@@ -1062,10 +1277,13 @@ def render(out_dir: Path, github_url: str) -> None:
     n_tests = len(per_test)
     n_runs  = len(all_runs)
     n_contribs = len(contributors["profiles"])
+    n_agents = len(per_agent)
+    n_providers = len(per_provider)
     print(f"✓ Wrote {out_dir / 'index.html'} ({sizes['index.html']:,} bytes)")
     print(f"✓ Wrote {out_dir / 'index.json'} ({sizes['index.json']:,} bytes — boot payload)")
     print(f"✓ Wrote {out_dir / 'runs.json'} ({sizes['runs.json']:,} bytes — runs tab)")
-    print(f"✓ Wrote {n_tests} tests/, {n_runs} runs/, {n_contribs} contributors/ shards")
+    print(f"✓ Wrote {n_tests} tests/, {n_runs} runs/, {n_contribs} contributors/, "
+          f"{n_agents} agents/, {n_providers} providers/ shards")
     print(f"  {summary['tests']} tests · {summary['runs']} runs · "
           f"{summary['stages']} stages · {summary['contributors']} contributors")
     print(f"  Local preview: python3 -m http.server -d {out_dir} 8000  →  http://localhost:8000")

@@ -814,6 +814,152 @@ td .pill { vertical-align: middle; }
   .profile-stats { grid-template-columns: repeat(3, 1fr); }
 }
 
+/* catalog hero — used by agent and provider profile pages.
+   Reuses .profile-stats / .profile-stat / .profile-eyebrow / .profile-handle.
+   Layout: logo on the left, main info to its right; stats wrap onto their own
+   row below, spanning both columns. minmax(0, 1fr) on the main column lets it
+   shrink instead of forcing horizontal overflow. */
+.catalog-hero {
+  background:
+    radial-gradient(680px 240px at 0% 0%, rgba(90,209,255,.08), transparent 60%),
+    radial-gradient(520px 200px at 100% 100%, rgba(255,106,213,.06), transparent 60%),
+    var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 18px;
+  padding: 26px 28px;
+  position: relative; overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 28px;
+  row-gap: 22px;
+  align-items: start;
+}
+.catalog-hero::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(90,209,255,.4), transparent);
+}
+.catalog-hero-logo {
+  width: 104px; height: 104px;
+  flex-shrink: 0;
+}
+.catalog-logo {
+  width: 100%; height: 100%;
+  border-radius: 6px;
+  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  box-shadow: 0 0 28px rgba(90,209,255,.18), 0 4px 18px rgba(0,0,0,.4);
+  display: block; object-fit: contain;
+  padding: 12px;
+}
+.catalog-logo.fallback {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 56px; color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+}
+.catalog-hero-main { min-width: 0; }
+.catalog-hero-desc {
+  margin: 8px 0 12px;
+  font-size: 13px; line-height: 1.5;
+  max-width: 70ch;
+  color: var(--text-dim);
+}
+.catalog-hero-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-size: 11.5px;
+}
+.catalog-hero-meta .profile-link {
+  margin: 0; overflow-wrap: anywhere;
+}
+.catalog-hero .profile-stats {
+  grid-column: 1 / -1;
+  /* Fixed 4-column grid so 7 stat tiles render as a clean 4+3 layout instead
+     of auto-fit leaving uneven empty tracks when item count doesn't divide
+     evenly into the available width. */
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+}
+/* Stack label above value inside each tile, both right-aligned. The base
+   .profile-stat uses inline spans that crowd when the label is long (e.g.
+   "TOTAL COST"); switching to a flex column gives the value its own line. */
+.catalog-hero .profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+@media (max-width: 720px) {
+  .catalog-hero .profile-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .catalog-hero { grid-template-columns: 1fr; }
+  .catalog-hero-logo { width: 80px; height: 80px; }
+}
+
+/* catalog tabs — horizontal scroller used by the agents and providers views
+   to pick which entry's detail shows below. */
+.catalog-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  margin-bottom: 18px;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+}
+.catalog-tabs::-webkit-scrollbar { height: 6px; }
+.catalog-tabs::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+.catalog-tab {
+  flex: 0 0 auto;
+  min-width: 150px;
+  max-width: 240px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.catalog-tab, .catalog-tab:hover, .catalog-tab:focus { text-decoration: none; }
+.catalog-tab:hover { border-color: var(--border-2); background: var(--panel-2); }
+.catalog-tab.active {
+  border-color: var(--cyan);
+  background: var(--panel-2);
+  box-shadow: 0 0 14px rgba(90,209,255,.18);
+}
+.catalog-tab-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.catalog-tab-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.catalog-tab.active .catalog-tab-name { color: var(--cyan); text-shadow: var(--glow-cyan); }
+.catalog-tab-type {
+  font-size: 10px;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+.catalog-tab-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 10.5px;
+}
+.catalog-tab-badge {
+  background: var(--bg-2);
+  padding: 2px 7px;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* ════════════════════════════════════════════════════════════════════════
    Help modal
    ════════════════════════════════════════════════════════════════════════ */

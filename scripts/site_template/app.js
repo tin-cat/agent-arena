@@ -110,6 +110,8 @@ const loadRuns        = ()         => loadJSON('runs.json').then((d) => d.runs);
 const loadTest        = (name)     => loadJSON(`tests/${encodeURIComponent(name)}.json`);
 const loadRun         = (t, id)    => loadJSON(`runs/${encodeURIComponent(t)}/${encodeURIComponent(id)}.json`);
 const loadContributor = (handle)   => loadJSON(`contributors/${encodeURIComponent(handle)}.json`);
+const loadAgent       = (id)       => loadJSON(`agents/${encodeURIComponent(id)}.json`);
+const loadProvider    = (id)       => loadJSON(`providers/${encodeURIComponent(id)}.json`);
 
 const SKELETON = `<div class="panel"><div class="panel-body t-mute">loading…</div></div>`;
 
@@ -139,6 +141,10 @@ const routes = [
   { pat: /^\/runs\/([^/]+)\/([^/]+)$/,                  name: 'runs',         handler: (m, gen) => renderRunDetail(m[1], m[2], 'runs', gen) },
   { pat: /^\/contributors$/,                            name: 'contributors', handler: (_m, gen) => renderContributors(gen) },
   { pat: /^\/contributors\/([^/]+)$/,                   name: 'contributors', handler: (m, gen) => renderContributorProfile(decodeURIComponent(m[1]), gen) },
+  { pat: /^\/agents$/,                                  name: 'agents',       handler: (_m, gen) => renderAgents(null, gen) },
+  { pat: /^\/agents\/([^/]+)$/,                         name: 'agents',       handler: (m, gen) => renderAgents(decodeURIComponent(m[1]), gen) },
+  { pat: /^\/providers$/,                               name: 'providers',    handler: (_m, gen) => renderProviders(null, gen) },
+  { pat: /^\/providers\/([^/]+)$/,                      name: 'providers',    handler: (m, gen) => renderProviders(decodeURIComponent(m[1]), gen) },
   { pat: /^\/hardware$/,                                name: 'hardware',     handler: (_m, gen) => renderHardware(gen) },
 ];
 
@@ -475,6 +481,160 @@ function testDetailHTML(t) {
     </div>
   `;
 }
+
+/* ─────────────────────── AGENTS · PROVIDERS (master-detail) ─────────────────────── */
+// Both views share the same template — the only differences are the list source,
+// the route prefix, and the cross-reference axis label. Encapsulated in `kind`.
+
+const CATALOG_KINDS = {
+  agents: {
+    list:       () => DATA.agents || [],
+    load:       (id) => loadAgent(id),
+    route:      'agents',
+    routeOther: 'providers',
+    tag:        '06',
+    title:      'coding agents',
+    lead:       'Per-agent breakdown of contributed runs, with the providers used alongside each.',
+    crumb:      'agents',
+    eyebrow:    'coding agent',
+    countSing:  'agent',
+    countPlur:  'agents',
+    crossLabel: 'providers used',
+    crossKey:   'provider',
+  },
+  providers: {
+    list:       () => DATA.providers || [],
+    load:       (id) => loadProvider(id),
+    route:      'providers',
+    routeOther: 'agents',
+    tag:        '07',
+    title:      'inference providers',
+    lead:       'Per-provider breakdown of contributed runs, with the agents observed against each.',
+    crumb:      'providers',
+    eyebrow:    'inference provider',
+    countSing:  'provider',
+    countPlur:  'providers',
+    crossLabel: 'agents used',
+    crossKey:   'agent',
+  },
+};
+
+function catalogTabHTML(kind, item, isActive) {
+  return `<a class="catalog-tab ${isActive ? 'active' : ''}" href="#/${kind.route}/${encodeURIComponent(item.id)}">
+    <div class="catalog-tab-head">
+      <div class="catalog-tab-name">${esc(item.name || item.id)}${!item.in_catalog ? ' <span class="pill muted">unlisted</span>' : ''}</div>
+      ${item.category ? `<div class="catalog-tab-type">${esc(item.category)}</div>` : ''}
+    </div>
+    <div class="catalog-tab-badges">
+      <span class="catalog-tab-badge">${item.run_count} run${item.run_count === 1 ? '' : 's'}</span>
+      <span class="catalog-tab-badge">${item.test_count} test${item.test_count === 1 ? '' : 's'}</span>
+      ${item.avg_rating_score != null ? `<span class="catalog-tab-badge">top ${fmtScore(item.avg_rating_score)}</span>` : ''}
+    </div>
+  </a>`;
+}
+
+function catalogDetailHTML(kind, d) {
+  const logoHTML = d.logo
+    ? `<img class="catalog-logo" src=".${esc(d.logo)}" alt="${esc(d.name)} logo" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'catalog-logo fallback',textContent:'▌'}))" />`
+    : `<span class="catalog-logo fallback">▌</span>`;
+
+  const crossRows = d.cross.map((c) => `
+    <tr class="clickable" onclick="location.hash='#/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}'">
+      <td><a href="#/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}"><code>${esc(c[kind.crossKey])}</code></a></td>
+      <td class="num">${c.run_count}</td>
+      <td class="num">${c.stage_count}</td>
+      <td style="min-width:170px">${bar(c.avg_rating_score)}</td>
+    </tr>`).join('');
+
+  const testRows = d.tests.map((t) => `
+    <tr class="clickable" onclick="location.hash='#/tests/${encodeURIComponent(t.test_name)}'">
+      <td><a href="#/tests/${encodeURIComponent(t.test_name)}">${esc(t.test_name)}</a></td>
+      <td class="t-mute">${esc(t.test_title)}</td>
+      <td class="num">${t.run_count}</td>
+      <td class="num">${t.stage_count}</td>
+      <td style="min-width:170px">${bar(t.avg_rating_score)}</td>
+    </tr>`).join('');
+
+  return `
+    <div class="crumbs">
+      <a href="#/${kind.route}">${esc(kind.crumb)}</a><span class="sep">/</span><span class="cur">${esc(d.id)}</span>
+    </div>
+
+    <section class="catalog-hero">
+      <div class="catalog-hero-logo">${logoHTML}</div>
+      <div class="catalog-hero-main">
+        <div class="profile-eyebrow t-mute">▌ ${esc(kind.eyebrow)}</div>
+        <h1 class="profile-handle">${esc(d.name || d.id)}</h1>
+        ${d.description ? `<p class="catalog-hero-desc t-mute">${esc(d.description)}</p>` : ''}
+        <div class="catalog-hero-meta">
+          ${d.category ? `<span class="pill">${esc(d.category)}</span>` : ''}
+          <span class="pill muted">id: ${esc(d.id)}</span>
+          ${d.homepage ? `<a class="profile-link" href="${esc(d.homepage)}" rel="noopener">${esc(d.homepage)}</a>` : ''}
+          ${!d.in_catalog ? `<span class="pill muted">unlisted — add to /${esc(kind.route)}.json</span>` : ''}
+        </div>
+        ${d.top_combo ? `<div class="profile-meta">top combo: <b>${esc(d.top_combo)}</b></div>` : ''}
+      </div>
+      <div class="profile-stats">
+        <div class="profile-stat"><span class="k">runs</span><span class="v">${d.run_count}</span></div>
+        <div class="profile-stat"><span class="k">stages</span><span class="v">${d.stage_count}</span></div>
+        <div class="profile-stat"><span class="k">tests</span><span class="v">${d.test_count}</span></div>
+        <div class="profile-stat"><span class="k">contributors</span><span class="v">${d.contributor_count}</span></div>
+        <div class="profile-stat"><span class="k">avg score</span><span class="v t-cyan">${fmtScore(d.avg_rating_score)}</span></div>
+        <div class="profile-stat"><span class="k">total cost</span><span class="v">${fmtMoney(d.total_cost_usd)}</span></div>
+        <div class="profile-stat"><span class="k">total time</span><span class="v">${fmtDuration(d.total_duration_sec)}</span></div>
+      </div>
+    </section>
+
+    <div class="split-2">
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title">${esc(kind.crossLabel)}</span><span class="panel-actions t-mute">${d.cross.length}</span></div>
+        <div class="panel-body dense">
+          ${d.cross.length ? `<table><thead><tr><th>${esc(kind.crossKey)}</th><th class="num">runs</th><th class="num">stages</th><th>score</th></tr></thead><tbody>${crossRows}</tbody></table>` : '<div style="padding:14px;color:var(--text-mute)">none yet.</div>'}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span class="panel-title alt">tests covered</span><span class="panel-actions t-mute">${d.tests.length}</span></div>
+        <div class="panel-body dense">
+          ${d.tests.length ? `<table><thead><tr><th>test</th><th>title</th><th class="num">runs</th><th class="num">stages</th><th>score</th></tr></thead><tbody>${testRows}</tbody></table>` : '<div style="padding:14px;color:var(--text-mute)">none yet.</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">contributed runs</span><span class="panel-actions t-mute">${d.runs.length} run${d.runs.length === 1 ? '' : 's'}</span></div>
+      <div class="panel-body dense">${runsTableHTML(d.runs, { showTest: true })}</div>
+    </div>
+  `;
+}
+
+async function renderCatalog(kind, selectedId, gen) {
+  const items = kind.list();
+  const selected = items.find((x) => x.id === selectedId) || items[0];
+
+  view().innerHTML = `
+    ${viewHead(kind.title, kind.tag, kind.lead)}
+
+    <nav class="catalog-tabs" aria-label="${esc(kind.countPlur)}">
+      ${items.map((x) => catalogTabHTML(kind, x, selected && x.id === selected.id)).join('')}
+    </nav>
+    <div id="catalogDetailSlot">${selected ? SKELETON : '<div class="panel"><div class="panel-body t-mute">no entries yet.</div></div>'}</div>
+  `;
+  if (!selected) return;
+
+  try {
+    const detail = await kind.load(selected.id);
+    if (isStale(gen)) return;
+    const slot = $('#catalogDetailSlot');
+    if (slot) slot.innerHTML = catalogDetailHTML(kind, detail);
+  } catch (err) {
+    if (isStale(gen)) return;
+    const slot = $('#catalogDetailSlot');
+    if (slot) slot.innerHTML = errorPanelHTML(err);
+  }
+}
+
+const renderAgents    = (id, gen) => renderCatalog(CATALOG_KINDS.agents, id, gen);
+const renderProviders = (id, gen) => renderCatalog(CATALOG_KINDS.providers, id, gen);
 
 function runsTableHTML(runs, opts = {}) {
   const { showTest = true, linkBase = '#/runs/' } = opts;
@@ -866,7 +1026,7 @@ function renderHardware() {
   const hd = h.headline;
 
   view().innerHTML = `
-    ${viewHead('silicon beasts', '06', 'A roll-call of the self-hosted rigs powering local inference in this benchmark. Speed, hardware, and the contributors who threw silicon at the problem.')}
+    ${viewHead('silicon beasts', '08', 'A roll-call of the self-hosted rigs powering local inference in this benchmark. Speed, hardware, and the contributors who threw silicon at the problem.')}
 
     ${hd.runs === 0 ? `
       <div class="panel"><div class="panel-body t-mute">No self-hosted runs yet — contribute one to launch this section.</div></div>
