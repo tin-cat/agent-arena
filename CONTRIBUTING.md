@@ -61,10 +61,10 @@ contributor_url: https://github.com/your-username   # see the note above — mus
 date: 2026-05-16              # the day the run was performed (YYYY-MM-DD)
 
 agent:
-  name: claude-code           # the coding agent / client (e.g. claude-code, cursor, aider, opencode)
+  name: claude-code           # one of: aider, amazon-q, amp, bolt, claude-code, cline, cody, codex, continue, copilot, crush, cursor, devin, gemini-cli, goose, jetbrains-ai, kiro, lovable, opencode, openhands, pearai, qwen-code, replit-agent, roo-code, supermaven, tabnine, trae, v0, windsurf, zed, other
   plan: pro                   # optional; the agent's plan or tier
 
-provider: anthropic           # one of: anthropic, openai, openrouter, bedrock, gemini, self-hosted, other
+provider: anthropic           # one of: anthropic, openai, gemini, openrouter, azure, vertex, bedrock, github-models, groq, together, fireworks, cerebras, deepinfra, replicate, sambanova, nvidia-nim, huggingface, mistral, deepseek, xai, cohere, perplexity, self-hosted, other
 model: sonnet-4.6             # the model identifier
 settings:                     # any agent or model settings that affect behavior
   effort: high

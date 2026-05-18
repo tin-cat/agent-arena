@@ -243,7 +243,29 @@ ThemeT = Literal[
 DOMAINS: tuple[str, ...] = typing.get_args(DomainT)
 THEMES: tuple[str, ...] = typing.get_args(ThemeT)
 
-PROVIDERS = ("anthropic", "openai", "openrouter", "bedrock", "gemini", "self-hosted", "other")
+# Fixed set of coding agents / clients. Add new entries here as they emerge.
+# Anything not on this list will fail validation; use "other" as the catch-all.
+AgentNameT = Literal[
+    "aider", "amazon-q", "amp", "bolt", "claude-code", "cline", "cody",
+    "codex", "continue", "copilot", "crush", "cursor", "devin", "gemini-cli",
+    "goose", "jetbrains-ai", "kiro", "lovable", "opencode", "openhands",
+    "pearai", "qwen-code", "replit-agent", "roo-code", "supermaven",
+    "tabnine", "trae", "v0", "windsurf", "zed", "other",
+]
+AGENT_NAMES: tuple[str, ...] = typing.get_args(AgentNameT)
+
+# Fixed set of inference providers. Add new entries here as they emerge.
+# Anything not on this list will fail validation; use "other" as the catch-all.
+ProviderT = Literal[
+    "anthropic", "openai", "gemini", "openrouter",
+    "azure", "vertex", "bedrock", "github-models",
+    "groq", "together", "fireworks", "cerebras", "deepinfra",
+    "replicate", "sambanova", "nvidia-nim", "huggingface",
+    "mistral", "deepseek", "xai", "cohere", "perplexity",
+    "self-hosted", "other",
+]
+PROVIDERS: tuple[str, ...] = typing.get_args(ProviderT)
+
 SELF_HOSTED_FRAMEWORKS = ("lm-studio", "ollama", "llama.cpp", "vllm", "mlx", "other")
 
 DOMAIN_LABELS = {
@@ -288,7 +310,7 @@ class Hardware(BaseModel, extra="allow"):
 
 
 class Agent(BaseModel):
-    name: str
+    name: AgentNameT
     plan: Optional[str] = None
 
 
@@ -306,7 +328,7 @@ class Run(BaseModel):
     contributor_url: str                # URL identifying the contributor (GitHub profile, personal site, Mastodon, etc.)
     date: date                          # the day the run was performed (YYYY-MM-DD)
     agent: Agent
-    provider: str
+    provider: ProviderT
     framework: Optional[str] = None     # inference engine (e.g. lm-studio, ollama, vllm). Required when provider == "self-hosted".
     model: str
     quantization: Optional[str] = None  # how the model is loaded (e.g. q4_K_M, fp16). Meaningful for self-hosted inference.
@@ -1384,7 +1406,12 @@ class RunAddScreen(Screen):
             yield Label("Date of the run (YYYY-MM-DD):", classes="field-label")
             yield Input(value=date.today().isoformat(), id="date")
             yield Label("Coding agent / client:", classes="field-label")
-            yield Input(placeholder="e.g. claude-code, cursor, aider, opencode", id="agent-name")
+            yield Select(
+                options=[(a, a) for a in AGENT_NAMES],
+                value="claude-code",
+                id="agent-name",
+                allow_blank=False,
+            )
             yield Label("Agent plan / tier (optional, e.g. pro):", classes="field-label")
             yield Input(placeholder="empty if N/A", id="agent-plan")
             yield Label("Inference provider:", classes="field-label")
@@ -1530,7 +1557,7 @@ class RunAddScreen(Screen):
 
         contributor_url = self.query_one("#contributor-url", Input).value.strip()
         date_raw = self.query_one("#date", Input).value.strip()
-        agent_name = self.query_one("#agent-name", Input).value.strip()
+        agent_name = str(self.query_one("#agent-name", Select).value)
         agent_plan = self.query_one("#agent-plan", Input).value.strip() or None
         provider = str(self.query_one("#provider", Select).value)
         model = self.query_one("#model", Input).value.strip()
