@@ -559,7 +559,7 @@ function testDetailHTML(t) {
       </div>
       <div class="panel">
         <div class="panel-head"><span class="panel-title alt">contributed runs</span><span class="panel-actions t-mute">${t.runs.length} run${t.runs.length === 1 ? '' : 's'}</span></div>
-        <div class="panel-body dense">${runsTableHTML(t.runs, { showTest: false, linkBase: `/tests/${t.name}/runs/` })}</div>
+        <div class="panel-body dense">${runsTableHTML(t.runs, { showTest: false })}</div>
       </div>
     </div>
   `;
@@ -778,19 +778,18 @@ const renderProviders = (id, gen) => renderCatalog(CATALOG_KINDS.providers, id, 
 const renderModels    = (id, gen) => renderCatalog(CATALOG_KINDS.models, id, gen);
 
 function runsTableHTML(runs, opts = {}) {
-  const { showTest = true, linkBase = '/runs/' } = opts;
+  const { showTest = true } = opts;
   if (!runs.length) return '<div style="padding:14px;color:var(--text-mute)">no runs yet.</div>';
   return `<table>
     <thead><tr>
       ${showTest ? '<th>test</th>' : ''}
-      <th>run</th><th>contributor</th><th>agent · model</th>
+      <th>contributor</th><th>agent · model</th>
       <th>stages</th><th>score</th>
       <th class="num">cost</th><th class="num">time</th><th class="num">date</th>
     </tr></thead>
     <tbody>${runs.map((r) => `
       <tr class="clickable" onclick="navigate('/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
         ${showTest ? `<td><a href="/tests/${esc(r.test_name)}/">${esc(r.test_name)}</a></td>` : ''}
-        <td><a href="/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/"><code>${esc(r.run_id)}</code></a></td>
         <td><a class="author-inline" href="${esc(r.contributor_url)}" rel="noopener">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
         <td>${esc(r.agent)} · <b>${esc(r.model)}</b> <span class="pill muted">${esc(r.provider)}</span></td>
         <td>${ratingDots(r.stages, r.stages_total)}</td>

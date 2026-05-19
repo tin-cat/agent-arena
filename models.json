@@ -1,0 +1,372 @@
+[
+  {
+    "id": "claude-opus-4.7",
+    "name": "Claude Opus 4.7",
+    "description": "Anthropic's top-tier flagship; strongest reasoning and long-horizon agentic coding, highest cost.",
+    "homepage": "https://www.anthropic.com/claude/opus",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["opus-4.7", "claude-opus-4-7"]
+  },
+  {
+    "id": "claude-sonnet-4.6",
+    "name": "Claude Sonnet 4.6",
+    "description": "Anthropic's mid-tier flagship; balanced coding performance and cost, widely used in agentic coding tools.",
+    "homepage": "https://www.anthropic.com/claude/sonnet",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["sonnet-4.6", "claude-sonnet-4-6"]
+  },
+  {
+    "id": "claude-haiku-4.5",
+    "name": "Claude Haiku 4.5",
+    "description": "Anthropic's fast, low-cost model; good for high-throughput coding tasks and simple agent loops.",
+    "homepage": "https://www.anthropic.com/claude/haiku",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["haiku-4.5", "claude-haiku-4-5"]
+  },
+  {
+    "id": "claude-opus-4.5",
+    "name": "Claude Opus 4.5",
+    "description": "Previous-generation Anthropic flagship; still strong on complex reasoning tasks.",
+    "homepage": "https://www.anthropic.com/news/claude-opus-4-5",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["opus-4.5", "claude-opus-4-5"]
+  },
+  {
+    "id": "claude-sonnet-4.5",
+    "name": "Claude Sonnet 4.5",
+    "description": "Previous-generation Anthropic mid-tier; baseline for many agentic coding benchmarks.",
+    "homepage": "https://www.anthropic.com/news/claude-sonnet-4-5",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["sonnet-4.5", "claude-sonnet-4-5"]
+  },
+  {
+    "id": "claude-3.7-sonnet",
+    "name": "Claude 3.7 Sonnet",
+    "description": "Hybrid reasoning model from Anthropic; introduced extended thinking. Older but still in production use.",
+    "homepage": "https://www.anthropic.com/news/claude-3-7-sonnet",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["claude-3-7-sonnet"]
+  },
+  {
+    "id": "gpt-5",
+    "name": "GPT-5",
+    "description": "OpenAI's flagship general-purpose model; strong coding and tool-use capabilities.",
+    "homepage": "https://openai.com/index/introducing-gpt-5/",
+    "category": "closed-hosted",
+    "vendor": "OpenAI",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "gpt-5-mini",
+    "name": "GPT-5 mini",
+    "description": "Smaller, cheaper, faster variant of GPT-5; popular default for cost-sensitive agentic use.",
+    "homepage": "https://openai.com/index/introducing-gpt-5/",
+    "category": "closed-hosted",
+    "vendor": "OpenAI",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "gpt-5-nano",
+    "name": "GPT-5 nano",
+    "description": "Smallest GPT-5 variant; cheapest, fastest, lower capability ceiling.",
+    "homepage": "https://openai.com/index/introducing-gpt-5/",
+    "category": "closed-hosted",
+    "vendor": "OpenAI",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "o3",
+    "name": "o3",
+    "description": "OpenAI's reasoning model; strong on math, code, and step-by-step problem solving.",
+    "homepage": "https://openai.com/index/introducing-o3-and-o4-mini/",
+    "category": "closed-hosted",
+    "vendor": "OpenAI",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "o4-mini",
+    "name": "o4-mini",
+    "description": "Smaller, cheaper OpenAI reasoning model; competitive on coding benchmarks at lower cost than o3.",
+    "homepage": "https://openai.com/index/introducing-o3-and-o4-mini/",
+    "category": "closed-hosted",
+    "vendor": "OpenAI",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "gpt-4.1",
+    "name": "GPT-4.1",
+    "description": "Coding-tuned GPT-4 generation from OpenAI; still common in pipelines and tools.",
+    "homepage": "https://openai.com/index/gpt-4-1/",
+    "category": "closed-hosted",
+    "vendor": "OpenAI",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "gemini-2.5-pro",
+    "name": "Gemini 2.5 Pro",
+    "description": "Google's flagship reasoning model; very long context, strong on code and multimodal tasks.",
+    "homepage": "https://deepmind.google/models/gemini/pro/",
+    "category": "closed-hosted",
+    "vendor": "Google",
+    "logo": "/logos/providers/gemini.svg",
+    "aliases": []
+  },
+  {
+    "id": "gemini-2.5-flash",
+    "name": "Gemini 2.5 Flash",
+    "description": "Cheaper, faster Gemini variant; balances cost and capability for coding agents.",
+    "homepage": "https://deepmind.google/models/gemini/flash/",
+    "category": "closed-hosted",
+    "vendor": "Google",
+    "logo": "/logos/providers/gemini.svg",
+    "aliases": []
+  },
+  {
+    "id": "gemini-2.5-flash-lite",
+    "name": "Gemini 2.5 Flash-Lite",
+    "description": "Smallest Gemini 2.5; cheapest token cost, suitable for high-volume light tasks.",
+    "homepage": "https://deepmind.google/models/gemini/flash-lite/",
+    "category": "closed-hosted",
+    "vendor": "Google",
+    "logo": "/logos/providers/gemini.svg",
+    "aliases": []
+  },
+  {
+    "id": "gemini-3-pro",
+    "name": "Gemini 3 Pro",
+    "description": "Google's next-generation flagship; improved reasoning and agentic coding over 2.5.",
+    "homepage": "https://deepmind.google/models/gemini/",
+    "category": "closed-hosted",
+    "vendor": "Google",
+    "logo": "/logos/providers/gemini.svg",
+    "aliases": []
+  },
+  {
+    "id": "grok-4",
+    "name": "Grok 4",
+    "description": "xAI's flagship model; strong on reasoning and coding, available via x.ai and OpenRouter.",
+    "homepage": "https://x.ai/news/grok-4",
+    "category": "closed-hosted",
+    "vendor": "xAI",
+    "logo": "/logos/providers/xai.svg",
+    "aliases": []
+  },
+  {
+    "id": "grok-4-fast",
+    "name": "Grok 4 Fast",
+    "description": "Cheaper, faster Grok 4 variant; popular for cost-sensitive coding agent runs.",
+    "homepage": "https://x.ai/news/grok-4-fast",
+    "category": "closed-hosted",
+    "vendor": "xAI",
+    "logo": "/logos/providers/xai.svg",
+    "aliases": []
+  },
+  {
+    "id": "deepseek-v3.2",
+    "name": "DeepSeek V3.2",
+    "description": "DeepSeek's hosted flagship; strong coding model at competitive pricing.",
+    "homepage": "https://api-docs.deepseek.com/news/news250929",
+    "category": "closed-hosted",
+    "vendor": "DeepSeek",
+    "logo": "/logos/providers/deepseek.svg",
+    "aliases": []
+  },
+  {
+    "id": "deepseek-r1",
+    "name": "DeepSeek R1",
+    "description": "DeepSeek's reasoning model; widely used via the DeepSeek API and inference platforms.",
+    "homepage": "https://api-docs.deepseek.com/news/news250120",
+    "category": "closed-hosted",
+    "vendor": "DeepSeek",
+    "logo": "/logos/providers/deepseek.svg",
+    "aliases": []
+  },
+  {
+    "id": "mistral-large-2",
+    "name": "Mistral Large 2",
+    "description": "Mistral's hosted flagship; general-purpose model with respectable coding ability.",
+    "homepage": "https://mistral.ai/news/mistral-large-2407",
+    "category": "closed-hosted",
+    "vendor": "Mistral",
+    "logo": "/logos/providers/mistral.svg",
+    "aliases": []
+  },
+  {
+    "id": "codestral-2",
+    "name": "Codestral 2",
+    "description": "Mistral's coding-specialized hosted model; designed for IDE and agentic coding workflows.",
+    "homepage": "https://mistral.ai/news/codestral-25-08",
+    "category": "closed-hosted",
+    "vendor": "Mistral",
+    "logo": "/logos/providers/mistral.svg",
+    "aliases": []
+  },
+  {
+    "id": "command-a",
+    "name": "Command A",
+    "description": "Cohere's flagship enterprise model; tool-use and reasoning oriented.",
+    "homepage": "https://cohere.com/blog/command-a",
+    "category": "closed-hosted",
+    "vendor": "Cohere",
+    "logo": null,
+    "aliases": []
+  },
+  {
+    "id": "meta-llama/llama-3.3-70b-instruct",
+    "name": "Llama 3.3 70B Instruct",
+    "description": "Meta's open-weight 70B instruct model; widely available across self-hosted and platform inference.",
+    "homepage": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct",
+    "category": "open-weight",
+    "vendor": "Meta",
+    "logo": null,
+    "aliases": ["llama-3.3-70b-instruct"]
+  },
+  {
+    "id": "meta-llama/llama-3.1-405b-instruct",
+    "name": "Llama 3.1 405B Instruct",
+    "description": "Meta's largest open-weight Llama 3.1 release; strong general capability, heavy infra needs.",
+    "homepage": "https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct",
+    "category": "open-weight",
+    "vendor": "Meta",
+    "logo": null,
+    "aliases": ["llama-3.1-405b-instruct"]
+  },
+  {
+    "id": "meta-llama/llama-3.1-8b-instruct",
+    "name": "Llama 3.1 8B Instruct",
+    "description": "Small open-weight Llama 3.1; common baseline for local runs and resource-constrained setups.",
+    "homepage": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+    "category": "open-weight",
+    "vendor": "Meta",
+    "logo": null,
+    "aliases": ["llama-3.1-8b-instruct"]
+  },
+  {
+    "id": "qwen/qwen2.5-coder-32b-instruct",
+    "name": "Qwen2.5 Coder 32B Instruct",
+    "description": "Alibaba Qwen's coding-tuned open-weight model; popular for self-hosted coding agents.",
+    "homepage": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
+    "category": "open-weight",
+    "vendor": "Qwen",
+    "logo": "/logos/agents/qwen-code.svg",
+    "aliases": ["qwen-2.5-coder-32b", "qwen2.5-coder-32b-instruct"]
+  },
+  {
+    "id": "qwen/qwen2.5-coder-7b-instruct",
+    "name": "Qwen2.5 Coder 7B Instruct",
+    "description": "Small Qwen2.5 Coder variant; runs on modest hardware while remaining competitive for coding tasks.",
+    "homepage": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
+    "category": "open-weight",
+    "vendor": "Qwen",
+    "logo": "/logos/agents/qwen-code.svg",
+    "aliases": ["qwen-2.5-coder-7b"]
+  },
+  {
+    "id": "qwen/qwen3-coder-30b",
+    "name": "Qwen3 Coder 30B",
+    "description": "Newer Qwen3-generation coding-focused open-weight model.",
+    "homepage": "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct",
+    "category": "open-weight",
+    "vendor": "Qwen",
+    "logo": "/logos/agents/qwen-code.svg",
+    "aliases": ["qwen3-coder-30b"]
+  },
+  {
+    "id": "qwen/qwen3-235b-a22b",
+    "name": "Qwen3 235B A22B",
+    "description": "Large Qwen3 MoE model; 22B active params, used as a flagship open-weight general model.",
+    "homepage": "https://huggingface.co/Qwen/Qwen3-235B-A22B",
+    "category": "open-weight",
+    "vendor": "Qwen",
+    "logo": "/logos/agents/qwen-code.svg",
+    "aliases": []
+  },
+  {
+    "id": "deepseek-ai/deepseek-v3",
+    "name": "DeepSeek V3 (open-weight)",
+    "description": "DeepSeek's open-weight V3 release; strong general capability, common in self-hosted setups.",
+    "homepage": "https://huggingface.co/deepseek-ai/DeepSeek-V3",
+    "category": "open-weight",
+    "vendor": "DeepSeek",
+    "logo": "/logos/providers/deepseek.svg",
+    "aliases": ["deepseek-v3-open"]
+  },
+  {
+    "id": "deepseek-ai/deepseek-r1-distill-qwen-32b",
+    "name": "DeepSeek R1 Distill Qwen 32B",
+    "description": "Distilled R1 reasoning model on a Qwen 32B base; popular open-weight reasoning model.",
+    "homepage": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+    "category": "open-weight",
+    "vendor": "DeepSeek",
+    "logo": "/logos/providers/deepseek.svg",
+    "aliases": ["deepseek-r1-distill-qwen-32b"]
+  },
+  {
+    "id": "deepseek-ai/deepseek-r1-distill-llama-70b",
+    "name": "DeepSeek R1 Distill Llama 70B",
+    "description": "Distilled R1 on a Llama 70B base; alternative open-weight reasoning model.",
+    "homepage": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
+    "category": "open-weight",
+    "vendor": "DeepSeek",
+    "logo": "/logos/providers/deepseek.svg",
+    "aliases": []
+  },
+  {
+    "id": "mistralai/codestral-22b-v0.1",
+    "name": "Codestral 22B",
+    "description": "Mistral's open-weight coding model; popular for self-hosted code completion and small agents.",
+    "homepage": "https://huggingface.co/mistralai/Codestral-22B-v0.1",
+    "category": "open-weight",
+    "vendor": "Mistral",
+    "logo": "/logos/providers/mistral.svg",
+    "aliases": ["codestral-22b-v0.1"]
+  },
+  {
+    "id": "mistralai/mistral-large-instruct-2411",
+    "name": "Mistral Large Instruct (2411)",
+    "description": "Mistral's open-weight large instruct release; competitive open alternative to hosted flagships.",
+    "homepage": "https://huggingface.co/mistralai/Mistral-Large-Instruct-2411",
+    "category": "open-weight",
+    "vendor": "Mistral",
+    "logo": "/logos/providers/mistral.svg",
+    "aliases": []
+  },
+  {
+    "id": "google/gemma-3-27b-it",
+    "name": "Gemma 3 27B IT",
+    "description": "Google's open-weight Gemma 3 instruction-tuned model; runs well on a single high-end GPU.",
+    "homepage": "https://huggingface.co/google/gemma-3-27b-it",
+    "category": "open-weight",
+    "vendor": "Google",
+    "logo": "/logos/providers/gemini.svg",
+    "aliases": []
+  },
+  {
+    "id": "microsoft/phi-4",
+    "name": "Phi-4",
+    "description": "Microsoft's small open-weight model; punches above its parameter count on reasoning benchmarks.",
+    "homepage": "https://huggingface.co/microsoft/phi-4",
+    "category": "open-weight",
+    "vendor": "Microsoft",
+    "logo": null,
+    "aliases": []
+  }
+]

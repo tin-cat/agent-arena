@@ -187,6 +187,34 @@ class RunStage(BaseModel):
     notes: Optional[str] = None
 
 
+def _load_model_aliases() -> dict[str, str]:
+    """Build an alias → canonical-id map from /models.json. Each catalog entry
+    may carry an "aliases" array listing legacy or short-form ids that should
+    aggregate together with the canonical id (e.g. "sonnet-4.6" → "claude-sonnet-4.6").
+    Missing or invalid models.json yields an empty map; aggregation then falls
+    back to raw string equality."""
+    path = REPO_ROOT / "models.json"
+    if not path.is_file():
+        return {}
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    out: dict[str, str] = {}
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        cid = e.get("id")
+        if not cid:
+            continue
+        for alias in (e.get("aliases") or []):
+            out[alias] = cid
+    return out
+
+
+MODEL_ALIASES: dict[str, str] = _load_model_aliases()
+
+
 class Run(BaseModel):
     contributor_url: str
     date: date
@@ -206,6 +234,13 @@ class Run(BaseModel):
         if not v.startswith(("http://", "https://")):
             raise ValueError("must be a URL starting with http:// or https://")
         return v
+
+    @field_validator("model")
+    @classmethod
+    def _normalize_model(cls, v: str) -> str:
+        """Rewrite legacy/short-form model ids to the canonical id from
+        /models.json so aggregation merges identical-model rows correctly."""
+        return MODEL_ALIASES.get(v, v)
 
     @model_validator(mode="after")
     def _require_framework_for_self_hosted(self) -> "Run":
@@ -719,16 +754,16 @@ def _infer_vendor(model_id: str) -> tuple[Optional[str], Optional[str]]:
     return None, None
 
 
-def build_per_model(loaded: dict[str, LoadedTest]) -> list[dict]:
-    """One entry per model identifier used in any run. No catalog file
-    backs this (models are too volatile to maintain a fixed list); display
-    metadata is left empty and the SPA falls back to the raw id and
-    first-letter logo."""
+def build_per_model(loaded: dict[str, LoadedTest], catalog: dict[str, dict]) -> list[dict]:
+    """One entry per model identifier used in any run. Catalog metadata
+    (display name, description, homepage, vendor, logo) comes from
+    /models.json when the id matches; otherwise we fall back to the raw id
+    and the id-prefix vendor inference."""
     rows = _build_grouped(
         loaded,
         key_fn=lambda r: r.model,
         cross_fn=lambda r: r.provider,
-        catalog={},
+        catalog=catalog,
         self_key="model",
         cross_key="provider",
         # For a model's "top combo" the cross-axis already implies the model;
@@ -737,18 +772,20 @@ def build_per_model(loaded: dict[str, LoadedTest]) -> list[dict]:
     )
     # The raw id (possibly an HF "org/repo" path) is what we want to display;
     # the URL-safe slug is what we want to route to and write as a filename.
-    # We also try to infer the model's vendor (lab that made it) from the id
-    # prefix — when it matches, the SPA shows a "by <vendor>" chip and points
-    # the logo at the lab's existing brand mark.
+    # Vendor: prefer the catalog's explicit value, otherwise fall back to the
+    # id-prefix heuristic so old non-catalog ids still get a "by <vendor>" chip.
     for row in rows:
         original = row["id"]
-        row["name"] = original
         row["id"] = _slug_model(original)
         row["model"] = original
-        vendor_name, vendor_logo = _infer_vendor(original)
+        meta = catalog.get(original, {})
+        vendor_name = meta.get("vendor")
+        if not vendor_name:
+            inferred_name, inferred_logo = _infer_vendor(original)
+            vendor_name = inferred_name
+            if inferred_logo and not row.get("logo"):
+                row["logo"] = inferred_logo
         row["vendor_name"] = vendor_name
-        if vendor_logo:
-            row["logo"] = vendor_logo
     return rows
 
 
@@ -1337,6 +1374,7 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
 
     agents_catalog    = load_catalog("agents.json")
     providers_catalog = load_catalog("providers.json")
+    models_catalog    = load_catalog("models.json")
 
     summary      = build_summary(loaded)
     leaderboard  = build_leaderboard(loaded)
@@ -1345,7 +1383,7 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
     per_test     = build_per_test(loaded)
     per_agent    = build_per_agent(loaded, agents_catalog)
     per_provider = build_per_provider(loaded, providers_catalog)
-    per_model    = build_per_model(loaded)
+    per_model    = build_per_model(loaded, models_catalog)
     all_runs     = build_all_runs(loaded)
     contributors = build_contributors(loaded)
     activity     = build_activity(loaded)

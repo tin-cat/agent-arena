@@ -171,29 +171,29 @@ git push origin main</pre>
   <section class="panel">
     <div class="panel-head"><span class="panel-title">the model identifier</span></div>
     <div class="panel-body">
-      <div>Use the <b>official</b> identifier so runs of the same model can be grouped on the leaderboard.</div>
+      <div>The model id is what groups runs together on the leaderboard. If two people record runs of the same model with different ids, they end up as two separate rows — so we keep a curated list of canonical ids in <a href="{{ github_url }}/blob/main/models.json" rel="noopener"><code>/models.json</code></a>.</div>
       <div class="kv-grid kv-wide">
         <div>
-          <span class="k">closed / hosted</span>
-          <span class="v">Use the canonical name from the provider's docs, e.g. <code>sonnet-4.6</code>, <code>gpt-5-mini</code>, <code>gemini-2.5-pro</code>.</span>
+          <span class="k">cli wizard</span>
+          <span class="v">The <code>run add</code> wizard offers a dropdown of every model in <code>/models.json</code>. Pick yours from there whenever possible.</span>
         </div>
         <div>
-          <span class="k">open weight</span>
-          <span class="v">Use the Hugging Face repo path in <code>org/repo</code> form — <code>meta-llama/Llama-3.3-70B-Instruct</code>, <code>Qwen/Qwen2.5-Coder-32B-Instruct</code>. Browse <a href="https://huggingface.co/models" rel="noopener">huggingface.co/models</a>.</span>
+          <span class="k">not in the list?</span>
+          <span class="v">The wizard's <code>— other —</code> option lets you type any id — your run will still be recorded. But to make it aggregate with other runs of the same model, open a PR adding the model to <code>/models.json</code> (see the next panel).</span>
         </div>
         <div>
-          <span class="k">unsure?</span>
-          <span class="v">For a cross-provider catalog, <a href="https://openrouter.ai/models" rel="noopener">openrouter.ai/models</a> is a convenient reference.</span>
+          <span class="k">id naming rules</span>
+          <span class="v">All lowercase. Closed-hosted: kebab-case with the vendor as a prefix when it disambiguates — <code>claude-sonnet-4.6</code>, <code>gpt-5-mini</code>, <code>gemini-2.5-pro</code>. Open-weight: HF-style <code>org/repo</code> in lowercase — <code>meta-llama/llama-3.3-70b-instruct</code>, <code>qwen/qwen2.5-coder-32b-instruct</code>. Use dots for version numbers, not hyphens.</span>
         </div>
       </div>
     </div>
   </section>
 
-  {# ─── AGENT / PROVIDER NOT LISTED ─── #}
+  {# ─── AGENT / PROVIDER / MODEL NOT LISTED ─── #}
   <section class="panel">
-    <div class="panel-head"><span class="panel-title">if your agent or provider isn't listed</span></div>
+    <div class="panel-head"><span class="panel-title">if your agent, provider, or model isn't listed</span></div>
     <div class="panel-body">
-      <div>Open a PR adding it to <a href="{{ github_url }}/blob/main/agents.json" rel="noopener"><code>/agents.json</code></a> or <a href="{{ github_url }}/blob/main/providers.json" rel="noopener"><code>/providers.json</code></a>. Each entry needs an <code>id</code> (kebab-case, used in <code>run.yaml</code>), <code>name</code>, <code>description</code>, <code>homepage</code>, and <code>category</code>.</div>
+      <div>Open a PR adding it to <a href="{{ github_url }}/blob/main/agents.json" rel="noopener"><code>/agents.json</code></a>, <a href="{{ github_url }}/blob/main/providers.json" rel="noopener"><code>/providers.json</code></a>, or <a href="{{ github_url }}/blob/main/models.json" rel="noopener"><code>/models.json</code></a>. Each entry needs an <code>id</code> (kebab-case for agents/providers/closed-hosted models; <code>org/repo</code> for open-weight models — all used in <code>run.yaml</code>), <code>name</code>, <code>description</code>, <code>homepage</code>, and <code>category</code>. Model entries also take a <code>vendor</code> string and an optional <code>aliases</code> array for legacy/short-form ids that should merge with the canonical one on the leaderboard.</div>
     </div>
   </section>
 

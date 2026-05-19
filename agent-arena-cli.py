@@ -275,6 +275,42 @@ def _load_id_list(filename: str) -> tuple[str, ...]:
 AGENT_NAMES: tuple[str, ...] = _load_id_list("agents.json")
 PROVIDERS: tuple[str, ...] = _load_id_list("providers.json")
 
+
+def _load_models() -> tuple[list[dict], dict[str, str]]:
+    """Load /models.json and return (entries, alias_map). Unlike agents and
+    providers, models are NOT a closed set — the model field accepts any
+    string. The catalog drives the wizard dropdown and aggregation; the
+    alias map normalizes legacy / short-form ids to canonical ones at
+    validation time so runs of the same model merge on the leaderboard."""
+    path = REPO_ROOT / "models.json"
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return [], {}
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f"\n[AgentArena] models.json: invalid JSON: {e}\n")
+        return [], {}
+    if not isinstance(entries, list):
+        return [], {}
+    alias_map: dict[str, str] = {}
+    valid: list[dict] = []
+    for e in entries:
+        if not isinstance(e, dict) or "id" not in e:
+            continue
+        valid.append(e)
+        for alias in (e.get("aliases") or []):
+            alias_map[alias] = e["id"]
+    return valid, alias_map
+
+
+MODELS_CATALOG, MODEL_ALIASES = _load_models()
+MODEL_IDS: tuple[str, ...] = tuple(m["id"] for m in MODELS_CATALOG)
+
+# Sentinel value used by the RunAddScreen's model Select dropdown to reveal
+# the free-form input. Any unique non-id string would do.
+_MODEL_OTHER_VALUE = "__other__"
+_MODEL_OTHER_LABEL = "Other (type your own)"
+
 SELF_HOSTED_FRAMEWORKS = ("lm-studio", "ollama", "llama.cpp", "vllm", "mlx", "other")
 
 DOMAIN_LABELS = {
@@ -369,6 +405,16 @@ class Run(BaseModel):
             opts = ", ".join(f"'{n}'" for n in PROVIDERS)
             raise ValueError(f"must be one of {opts} (see /providers.json)")
         return v
+
+    @field_validator("model")
+    @classmethod
+    def _normalize_model(cls, v: str) -> str:
+        """Rewrite legacy / short-form model ids to the canonical id from
+        /models.json. Unknown ids are accepted as-is — the model field is
+        free-form; the catalog only drives aggregation and the wizard
+        dropdown."""
+        v = v.strip()
+        return MODEL_ALIASES.get(v, v)
 
     @model_validator(mode="after")
     def _require_framework_for_self_hosted(self) -> "Run":
@@ -659,6 +705,14 @@ Input, TextArea, Select {
 }
 
 #self-hosted-section.hidden {
+    display: none;
+}
+
+#model-other-section {
+    height: auto;
+}
+
+#model-other-section.hidden {
     display: none;
 }
 
@@ -1471,19 +1525,29 @@ class RunAddScreen(Screen):
                 id="provider",
                 allow_blank=False,
             )
-            yield Label("Model identifier:", classes="field-label")
-            yield Input(
-                placeholder="e.g. sonnet-4.6, gpt-5-mini, meta-llama/Llama-3.3-70B-Instruct",
-                id="model",
+            yield Label("Model:", classes="field-label")
+            yield Select(
+                options=[(_MODEL_OTHER_LABEL, _MODEL_OTHER_VALUE)]
+                        + [(f"{m['name']} · {m['id']}", m["id"]) for m in MODELS_CATALOG],
+                id="model-select",
+                allow_blank=True,
+                prompt="Select a model…",
             )
-            yield Label(
-                "Please use the official identifier — from the provider's docs for closed models, "
-                "or from huggingface.co/models (as org/repo) for open-weight ones.",
+            with Container(id="model-other-section", classes="hidden"):
+                yield Label("Model identifier (free-form):", classes="field-label")
+                yield Input(
+                    placeholder="e.g. some-new-model, my-org/my-finetune-v2",
+                    id="model-other",
+                )
+            yield Static(
+                "Pick your model from the list. If it isn't there, choose 'Other (type your own)'"
+                "and enter the id below. To have a new model added to the list, contribute "
+                "a new entry in models.json. More info: [bold cyan]https://agentarena.tin.cat/contribute/[/].",
                 classes="help-text",
             )
             yield Label("Settings (one 'key=value' per line, optional):", classes="field-label")
             yield TextArea("", id="settings-area")
-            yield Label(
+            yield Static(
                 "If you used any extra MCP servers, skills, custom subagents, or hooks beyond the "
                 "agent's defaults, list them here (e.g. 'mcps=linear,sentry', 'skills=simplify,review'). "
                 "Runs with undisclosed tooling aren't comparable to vanilla runs.",
@@ -1505,7 +1569,7 @@ class RunAddScreen(Screen):
                 yield Input(id="hw-ram")
             yield Label("Stages", classes="section-title")
             yield Label("Select a row, then 'Record' to fill in its metrics.", classes="help-text")
-            yield Label(
+            yield Static(
                 "Start every stage from a fresh agent session: fully close your coding agent and "
                 "reopen it before each stage, so no prior context carries over (the codebase is "
                 "preserved, but the session is not). Record API time only: the time the agent spent "
@@ -1564,6 +1628,14 @@ class RunAddScreen(Screen):
     @_on_event(Select.Changed, "#provider")
     def _on_provider_changed(self, event: Select.Changed) -> None:  # noqa: ARG002
         self._update_self_hosted_visibility()
+
+    @_on_event(Select.Changed, "#model-select")
+    def _on_model_select_changed(self, event: Select.Changed) -> None:
+        section = self.query_one("#model-other-section", Container)
+        if event.value == _MODEL_OTHER_VALUE:
+            section.remove_class("hidden")
+        else:
+            section.add_class("hidden")
 
     def _update_self_hosted_visibility(self) -> None:
         section = self.query_one("#self-hosted-section", Container)
@@ -1632,7 +1704,15 @@ class RunAddScreen(Screen):
         agent_name = str(self.query_one("#agent-name", Select).value)
         agent_plan = self.query_one("#agent-plan", Input).value.strip() or None
         provider = str(self.query_one("#provider", Select).value)
-        model = self.query_one("#model", Input).value.strip()
+        # The model dropdown stores the canonical id directly, except for the
+        # "other" sentinel which routes to the free-form input below it.
+        model_select_value = self.query_one("#model-select", Select).value
+        if model_select_value == _MODEL_OTHER_VALUE:
+            model = self.query_one("#model-other", Input).value.strip()
+        elif model_select_value in (Select.BLANK, None):
+            model = ""
+        else:
+            model = str(model_select_value)
         settings_raw = self.query_one("#settings-area", TextArea).text.strip()
 
         errors: list[str] = []
