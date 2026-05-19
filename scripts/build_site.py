@@ -128,7 +128,9 @@ from datetime import date
 from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
+from html import escape as _hesc
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from markupsafe import Markup
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from ruamel.yaml import YAML
 
@@ -1248,6 +1250,86 @@ def _validate_via_cli() -> None:
         sys.exit(result.returncode)
 
 
+# --------------------------------------------------------------------------- #
+# YAML syntax highlighter — small, tuned for the contribute-page examples.
+# Tokens are wrapped in <span class="tk-…">, colored by rules in styles.css:
+#   tk-c  comment   tk-k  key   tk-l  list dash   tk-b  block scalar
+#   tk-s  string    tk-n  number / bool
+# This isn't a general lexer — it leans on the examples being well-formed.
+# --------------------------------------------------------------------------- #
+_YAML_KEY_VAL_RE = re.compile(
+    r"^(\s*)"                          # indent
+    r"(-\s+)?"                         # optional "- " list marker
+    r"([A-Za-z_][\w\-.]*)"             # key
+    r"(:)"                             # colon
+    r"(\s*)"                           # spaces after colon
+    r"(.*)$"                           # rest (value, may be empty)
+)
+_YAML_BARE_DASH_RE = re.compile(r"^(\s*)(-\s+)(.*)$")
+_YAML_NUM_RE  = re.compile(r"-?\d+(?:\.\d+)?")
+_YAML_BOOL_RE = re.compile(r"(?:true|false|null|yes|no)", re.I)
+
+
+def _split_yaml_comment(line: str) -> tuple[str, str]:
+    """Split off a trailing ``# …`` comment. Honors quotes so a ``#`` inside
+    a quoted string isn't mistaken for a comment."""
+    in_q: Optional[str] = None
+    for i, ch in enumerate(line):
+        if ch in ('"', "'"):
+            if in_q is None:
+                in_q = ch
+            elif in_q == ch:
+                in_q = None
+        elif ch == "#" and in_q is None and (i == 0 or line[i - 1].isspace()):
+            return line[:i], line[i:]
+    return line, ""
+
+
+def _hl_yaml_value(v: str) -> str:
+    """Wrap a YAML value (post-colon) with a token-class span, preserving
+    surrounding whitespace so column alignment in the examples is kept."""
+    leading = v[: len(v) - len(v.lstrip())]
+    core = v.strip()
+    trailing = v[len(leading) + len(core):]
+    if not core:
+        return _hesc(v)
+    if core in ("|", ">", "|-", ">-", "|+", ">+"):
+        cls = "tk-b"
+    elif _YAML_NUM_RE.fullmatch(core) or _YAML_BOOL_RE.fullmatch(core):
+        cls = "tk-n"
+    else:
+        cls = "tk-s"
+    return f'{_hesc(leading)}<span class="{cls}">{_hesc(core)}</span>{_hesc(trailing)}'
+
+
+def highlight_yaml(text: str) -> Markup:
+    out: list[str] = []
+    for raw in text.splitlines():
+        code, comment = _split_yaml_comment(raw)
+        if not code.strip():
+            line = _hesc(code)
+        elif (m := _YAML_KEY_VAL_RE.match(code)):
+            indent, dash, key, colon, sp, val = m.groups()
+            parts = [_hesc(indent)]
+            if dash:
+                parts.append(f'<span class="tk-l">{_hesc(dash)}</span>')
+            parts.append(f'<span class="tk-k">{_hesc(key)}</span>')
+            parts.append(_hesc(colon) + _hesc(sp))
+            if val:
+                parts.append(_hl_yaml_value(val))
+            line = "".join(parts)
+        elif (md := _YAML_BARE_DASH_RE.match(code)):
+            indent, dash, rest = md.groups()
+            line = _hesc(indent) + f'<span class="tk-l">{_hesc(dash)}</span>' + (_hl_yaml_value(rest) if rest else "")
+        else:
+            # Block-scalar body or anything we don't recognize — render plain.
+            line = _hesc(code)
+        if comment:
+            line += f'<span class="tk-c">{_hesc(comment)}</span>'
+        out.append(line)
+    return Markup("\n".join(out))
+
+
 def render(out_dir: Path, github_url: str, site_url: str) -> None:
     _validate_via_cli()
     loaded = load_all()
@@ -1282,8 +1364,8 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
         github_url=github_url,
         git_clone_url=github_url.rstrip("/") + ".git",
         rating_color=RATING_COLOR,
-        run_yaml_example=(CONTRIBUTE_TPL_DIR / "run.yaml.example").read_text(encoding="utf-8").rstrip(),
-        test_yaml_example=(CONTRIBUTE_TPL_DIR / "test.yaml.example").read_text(encoding="utf-8").rstrip(),
+        run_yaml_example=highlight_yaml((CONTRIBUTE_TPL_DIR / "run.yaml.example").read_text(encoding="utf-8").rstrip()),
+        test_yaml_example=highlight_yaml((CONTRIBUTE_TPL_DIR / "test.yaml.example").read_text(encoding="utf-8").rstrip()),
         directory_tree=(CONTRIBUTE_TPL_DIR / "directory-tree.txt.example").read_text(encoding="utf-8").rstrip(),
     )
 

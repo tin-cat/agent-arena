@@ -1387,7 +1387,7 @@ body.nav-open .nav-backdrop { display: block; }
 .gauntlet { list-style: none; margin: 14px 0 0; padding: 0; }
 .gauntlet > li {
   display: grid;
-  grid-template-columns: 68px 1fr;
+  grid-template-columns: 30px 1fr;
   gap: 20px;
   padding: 18px 4px;
   border-bottom: 1px dashed var(--border);
@@ -1411,7 +1411,7 @@ body.nav-open .nav-backdrop { display: block; }
 .step-text code, .step-text b { color: var(--text); }
 .step-text b { font-weight: 700; }
 .step-text i { color: var(--text); font-style: italic; }
-.step-callout {
+.note {
   margin-top: 12px;
   border-left: 2px solid var(--cyan);
   background: rgba(90,209,255,.05);
@@ -1419,17 +1419,17 @@ body.nav-open .nav-backdrop { display: block; }
   font-size: 12px; line-height: 1.65; color: var(--text-dim);
   border-radius: 0 4px 4px 0;
 }
-.step-callout b { color: var(--text); }
-.step-callout i { color: var(--text-dim); font-style: italic; }
-.step-callout code { color: var(--text); background: rgba(90,209,255,.10); }
-.step-callout.magenta { border-color: var(--magenta); background: rgba(255,106,213,.06); }
-.step-callout-tag {
+.note b { color: var(--text); }
+.note i { color: var(--text-dim); font-style: italic; }
+.note code { color: var(--text); background: rgba(90,209,255,.10); }
+.note.magenta { border-color: var(--magenta); background: rgba(255,106,213,.06); }
+.note-tag {
   display: inline-block;
   color: var(--cyan); text-shadow: var(--glow-cyan);
   font-size: 9.5px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700;
   margin-right: 10px;
 }
-.step-callout.magenta .step-callout-tag { color: var(--magenta); text-shadow: var(--glow-magenta); }
+.note.magenta .note-tag { color: var(--magenta); text-shadow: var(--glow-magenta); }
 
 /* RATING GALLERY */
 .rating-gallery {
@@ -1517,3 +1517,9 @@ body.nav-open .nav-backdrop { display: block; }
   margin-bottom: 20px;
 }
 .contrib-cta-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.contrib-cta-licence {
+  margin-top: 22px;
+  color: var(--text-mute); font-size: 10.5px; letter-spacing: .2px;
+}
+.contrib-cta-licence a { color: var(--text-dim); }
+.contrib-cta-licence a:hover { color: var(--cyan); }
