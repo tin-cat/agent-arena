@@ -1256,7 +1256,7 @@ function renderHardware() {
       <div class="panel">
         <div class="panel-body" style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
           <div class="t-dim" style="font-size:12px;">▌ got a workstation, an M-series, an exotic GPU? show off how it performs.</div>
-          <a class="cta cta-primary" href="${esc(DATA.github_url)}/blob/main/CONTRIBUTING.md" rel="noopener">+ contribute a self-hosted run</a>
+          <a class="cta cta-primary" href="/contribute/" rel="noopener">+ contribute a self-hosted run</a>
         </div>
       </div>
     `}
