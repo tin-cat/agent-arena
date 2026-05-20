@@ -28,7 +28,12 @@ const esc = (s) =>
 const fmtMoney = (v) => v == null ? '—' : '$' + Number(v).toFixed(2);
 const fmtNum   = (v) => v == null ? '—' : new Intl.NumberFormat().format(v);
 const fmtPct   = (v) => v == null ? '—' : Math.round(v * 100) + '%';
-const fmtScore = (v) => v == null ? '—' : Number(v).toFixed(2);
+// Scores are stored/computed on a 0–1 scale (RATING_SCORE), but displayed on a
+// friendlier 0–10 scale: 0.93 → "9.3". fmtScore is the compact form for tables,
+// bars and badges; fmtScoreDetail adds precision + the "/10" suffix for the
+// prominent score stat on detail/profile pages.
+const fmtScore       = (v) => v == null ? '—' : (Number(v) * 10).toFixed(1);
+const fmtScoreDetail = (v) => v == null ? '—' : (Number(v) * 10).toFixed(2) + '/10';
 
 function fmtDuration(seconds) {
   if (seconds == null) return '—';
@@ -346,10 +351,10 @@ function heroHTML() {
 }
 
 const RATING_SCALE_ROWS = [
-  ['excellent', '1.00', 'clean one-shot'],
-  ['good',      '0.75', 'minor follow-up'],
-  ['partial',   '0.40', 'major gaps'],
-  ['failed',    '0.00', 'could not complete'],
+  ['excellent', '10.0', 'clean one-shot'],
+  ['good',      '7.5',  'minor follow-up'],
+  ['partial',   '4.0',  'major gaps'],
+  ['failed',    '0.0',  'could not complete'],
 ];
 function ratingScaleHTML() {
   return `
@@ -420,7 +425,7 @@ function renderLeaderboard() {
   const rows = DATA.leaderboard;
 
   view().innerHTML = `
-    ${viewHead('leaderboard', '02', 'Aggregated across every contributed stage. Ranked by average rating score (excellent = 1.0, good = 0.75, partial = 0.4, failed = 0.0).')}
+    ${viewHead('leaderboard', '02', 'Aggregated across every contributed stage. Ranked by average rating score on a 0–10 scale (excellent = 10, good = 7.5, partial = 4, failed = 0).')}
 
     <div class="panel">
       <div class="panel-head">
@@ -457,7 +462,7 @@ function leaderboardTableHTML(rows) {
         <td class="num">${r.stage_count}</td>
         <td class="num">${fmtMoney(r.avg_cost_per_stage)}</td>
         <td class="num">${fmtDuration(r.avg_duration_sec)}</td>
-        <td class="num">${r.rating_per_dollar == null ? '—' : Number(r.rating_per_dollar).toFixed(2)}</td>
+        <td class="num">${r.rating_per_dollar == null ? '—' : (Number(r.rating_per_dollar) * 10).toFixed(2)}</td>
       </tr>`).join('')}
     </tbody>
   </table>`;
@@ -527,7 +532,7 @@ function testDetailHTML(t) {
           ${t.domain ? `<div><span class="k">domain</span><span class="v"><span class="pill">${esc(t.domain)}</span></span></div>` : ''}
           <div><span class="k">stages</span><span class="v">${t.stages_total}</span></div>
           <div><span class="k">contributed runs</span><span class="v">${t.run_count}</span></div>
-          <div><span class="k">top score</span><span class="v t-cyan">${fmtScore(t.runs[0]?.avg_rating_score)}</span></div>
+          <div><span class="k">top score</span><span class="v t-cyan">${fmtScoreDetail(t.runs[0]?.avg_rating_score)}</span></div>
           <div><span class="k">source</span><span class="v"><a href="${esc(DATA.github_url)}/tree/main/tests/${esc(t.name)}" rel="noopener">/tests/${esc(t.name)}</a></span></div>
         </div>
       </div>
@@ -687,7 +692,7 @@ function catalogDetailHTML(kind, d) {
         <div class="profile-stat"><span class="k">stages</span><span class="v">${d.stage_count}</span></div>
         <div class="profile-stat"><span class="k">tests</span><span class="v">${d.test_count}</span></div>
         <div class="profile-stat"><span class="k">contributors</span><span class="v">${d.contributor_count}</span></div>
-        <div class="profile-stat"><span class="k">avg score</span><span class="v t-cyan">${fmtScore(d.avg_rating_score)}</span></div>
+        <div class="profile-stat"><span class="k">avg score</span><span class="v t-cyan">${fmtScoreDetail(d.avg_rating_score)}</span></div>
         <div class="profile-stat"><span class="k">total cost</span><span class="v">${fmtMoney(d.total_cost_usd)}</span></div>
         <div class="profile-stat"><span class="k">total time</span><span class="v">${fmtDuration(d.total_duration_sec)}</span></div>
       </div>
@@ -868,7 +873,7 @@ async function renderRunDetail(testName, runId, parentRoute, gen) {
             <div><span class="k">date</span><span class="v">${esc(run.date)}</span></div>
             <div><span class="k">agent</span><span class="v">${esc(run.agent)}${run.agent_plan ? ` <span class="t-mute">· ${esc(run.agent_plan)}</span>` : ''}</span></div>
             <div><span class="k">model</span><span class="v">${esc(run.model)}</span></div>
-            <div><span class="k">avg score</span><span class="v t-cyan">${fmtScore(run.avg_rating_score)}</span></div>
+            <div><span class="k">avg score</span><span class="v t-cyan">${fmtScoreDetail(run.avg_rating_score)}</span></div>
             <div><span class="k">stages</span><span class="v">${run.stages_run} / ${run.stages_total}</span></div>
             <div><span class="k">total cost</span><span class="v">${fmtMoney(run.total_cost_usd)}</span></div>
             <div><span class="k">total time</span><span class="v">${fmtDuration(run.total_duration_sec)}</span></div>
@@ -1067,7 +1072,7 @@ async function renderContributorProfile(handle, gen) {
           <div class="profile-stat"><div class="k">runs</div><div class="v">${p.run_count}</div></div>
           <div class="profile-stat"><div class="k">stages</div><div class="v">${p.stage_count}</div></div>
           <div class="profile-stat"><div class="k">tests</div><div class="v">${p.test_count}</div></div>
-          <div class="profile-stat"><div class="k">avg score</div><div class="v t-cyan">${fmtScore(p.avg_rating_score)}</div></div>
+          <div class="profile-stat"><div class="k">avg score</div><div class="v t-cyan">${fmtScoreDetail(p.avg_rating_score)}</div></div>
           <div class="profile-stat"><div class="k">total cost</div><div class="v">${fmtMoney(p.total_cost_usd)}</div></div>
           <div class="profile-stat"><div class="k">total time</div><div class="v">${fmtDuration(p.total_duration_sec)}</div></div>
         </div>
@@ -1358,8 +1363,8 @@ function mountHwBarChart(canvasId, rows, fieldName) {
             label: (ctx) => {
               const r = sorted[ctx.dataIndex];
               return haveTokens
-                ? [`${ctx.raw.toFixed(1)} tok/s`, `${r.stage_count} stages · score ${(r.avg_rating_score ?? 0).toFixed(2)}`]
-                : [`${fmtDuration(ctx.raw)} avg`, `${r.stage_count} stages · score ${(r.avg_rating_score ?? 0).toFixed(2)}`];
+                ? [`${ctx.raw.toFixed(1)} tok/s`, `${r.stage_count} stages · score ${((r.avg_rating_score ?? 0) * 10).toFixed(1)}`]
+                : [`${fmtDuration(ctx.raw)} avg`, `${r.stage_count} stages · score ${((r.avg_rating_score ?? 0) * 10).toFixed(1)}`];
             },
           },
         },
@@ -1436,7 +1441,7 @@ function mountScatter() {
             label: (ctx) => {
               const p = ctx.raw;
               return [
-                `score ${p.y.toFixed(2)} · $${p.x < 1 ? p.x.toFixed(4) : p.x.toFixed(2)} / stage`,
+                `score ${(p.y * 10).toFixed(1)} · $${p.x < 1 ? p.x.toFixed(4) : p.x.toFixed(2)} / stage`,
                 `${p.run_count} run${p.run_count === 1 ? '' : 's'} · ${p.stage_count} stage${p.stage_count === 1 ? '' : 's'} · ${p.test_count} test${p.test_count === 1 ? '' : 's'}`,
                 p.providers.length > 1 ? `via ${p.providers.join(', ')}` : `via ${p.providers[0]}`,
               ];
@@ -1449,7 +1454,8 @@ function mountScatter() {
              title: { display: true, text: 'avg cost / stage (USD)', color: '#5d6878', font: { size: 10 } },
              ticks: { ...COMMON_SCALES.ticks, callback: (v) => '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)) } },
         y: { ...COMMON_SCALES, min: 0, max: 1,
-             title: { display: true, text: 'avg rating score', color: '#5d6878', font: { size: 10 } } },
+             ticks: { ...COMMON_SCALES.ticks, callback: (v) => (v * 10).toFixed(0) },
+             title: { display: true, text: 'avg rating score (0–10)', color: '#5d6878', font: { size: 10 } } },
       },
     },
   });
@@ -1501,10 +1507,11 @@ function mountLeaderBar(rows) {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { ...COMMON_TOOLTIP, callbacks: { label: (ctx) => `score ${ctx.raw.toFixed(2)}` } },
+        tooltip: { ...COMMON_TOOLTIP, callbacks: { label: (ctx) => `score ${(ctx.raw * 10).toFixed(1)}` } },
       },
       scales: {
-        x: { ...COMMON_SCALES, min: 0, max: 1 },
+        x: { ...COMMON_SCALES, min: 0, max: 1,
+             ticks: { ...COMMON_SCALES.ticks, callback: (v) => (v * 10).toFixed(0) } },
         y: { ...COMMON_SCALES, ticks: { ...COMMON_SCALES.ticks, font: { size: 10 } } },
       },
     },
@@ -1565,7 +1572,7 @@ function mountRunStageChart(run, test) {
           title: (items) => stages[items[0].datasetIndex].id,
           label: (ctx) => {
             const s = stages[ctx.datasetIndex];
-            const score = (RATING_SCORE[s.rating] ?? 0).toFixed(2);
+            const score = ((RATING_SCORE[s.rating] ?? 0) * 10).toFixed(1);
             return [
               `${s.rating} · score ${score}`,
               useDur ? fmtDuration(s.duration_sec || 0) : 'duration unrecorded',
