@@ -48,6 +48,18 @@
     "logo": "/logos/stacks/vanilla-js.svg"
   },
   {
+    "id": "node",
+    "name": "Node.js",
+    "category": "JavaScript",
+    "language": "javascript",
+    "description": "Node.js.",
+    "homepage": "https://nodejs.org",
+    "keywords": [
+      "node"
+    ],
+    "logo": "/logos/stacks/node.svg"
+  },
+  {
     "id": "node-express",
     "name": "Node + Express",
     "category": "JavaScript",

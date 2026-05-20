@@ -7,6 +7,7 @@ description: |
   new messages arrive. Later stages add lazy loading, rate limiting, fading
   by age, security hardening, and threaded replies.
 domain: full-stack-web
+stack: node-express
 
 stages:
   - id: stage-1-first-run
@@ -26,6 +27,8 @@ stages:
       Messages on the wall have a fixed size, and the text is cropped if it does not fit into the message card. When clicked, a model opens to let the user read the entire message.
 
       Messages on the wall are displayed from top to bottom and left to right, just like the text flow of newspapers, filling the entire available screen, and scrolling horizontally when there are more messages than the screen can fit.
+
+      Build it with Node and Express.
 
       Add a README.md file that documents the application and its technical structure.
 
