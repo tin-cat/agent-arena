@@ -167,11 +167,11 @@ git push origin main</pre>
     </div>
   </section>
 
-  {# ─── AGENT / PROVIDER / MODEL NOT LISTED ─── #}
+  {# ─── AGENT / PROVIDER / MODEL / STACK NOT LISTED ─── #}
   <section class="panel">
-    <div class="panel-head"><span class="panel-title">if your agent, provider, or model isn't listed</span></div>
+    <div class="panel-head"><span class="panel-title">if your agent, provider, model or stack isn't listed</span></div>
     <div class="panel-body">
-      <div>Open a PR adding it to <a href="{{ github_url }}/blob/main/agents.json" rel="noopener"><code>/agents.json</code></a>, <a href="{{ github_url }}/blob/main/providers.json" rel="noopener"><code>/providers.json</code></a>, or <a href="{{ github_url }}/blob/main/models.json" rel="noopener"><code>/models.json</code></a>. Each entry needs an <code>id</code> (kebab-case for agents/providers/closed-hosted models; <code>org/repo</code> for open-weight models — all used in <code>run.yaml</code>), <code>name</code>, <code>description</code>, <code>homepage</code>, and <code>category</code>. Model entries also take a <code>vendor</code> string and an optional <code>aliases</code> array for legacy/short-form ids that should merge with the canonical one on the leaderboard.</div>
+      <div>Open a PR adding it to <a href="{{ github_url }}/blob/main/agents.json" rel="noopener"><code>/agents.json</code></a>, <a href="{{ github_url }}/blob/main/providers.json" rel="noopener"><code>/providers.json</code></a>, <a href="{{ github_url }}/blob/main/models.json" rel="noopener"><code>/models.json</code></a>, or <a href="{{ github_url }}/blob/main/stsacks.json" rel="noopener"><code>/stacks.json</code></a>. Each entry needs an <code>id</code> (kebab-case for agents/providers/closed-hosted models; <code>org/repo</code> for open-weight models — all used in <code>run.yaml</code>), <code>name</code>, <code>description</code>, <code>homepage</code>, and <code>category</code>. Model entries also take a <code>vendor</code> string and an optional <code>aliases</code> array for legacy/short-form ids that should merge with the canonical one on the leaderboard.</div>
     </div>
   </section>
 
