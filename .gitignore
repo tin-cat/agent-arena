@@ -11,6 +11,16 @@ tests/markdown-to-html
 tests/pixel-canvas
 tests/rest-api-todo
 tests/snake-game
+tests/url-shortener
+tests/weather-dashboard
+tests/expense-tracker
+tests/realtime-chat
+tests/tower-defense
+tests/image-resizer
+tests/kanban-board
+tests/log-analyzer
+tests/note-taking-app
+tests/json-schema-validator
 
 # Annoying files
 .DS_Store
