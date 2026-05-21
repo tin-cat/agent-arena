@@ -475,30 +475,35 @@ function leaderboardTableHTML(rows) {
 /* ────────────────────────────── 03 · TESTS ────────────────────────────── */
 async function renderTests(selectedName, gen) {
   const tests = DATA.tests;
-  const selected = tests.find((t) => t.name === selectedName) || tests[0];
 
-  // Horizontal tab strip (same pattern as agents/providers/models), then a
-  // detail slot below that lazy-loads tests/<name>.json.
-  view().innerHTML = `
-    ${viewHead('tests', '03', 'Browse community-defined tests, their stage prompts, and the runs contributed against each.')}
+  // /tests/ (no selection): show only the list of tests, as a wrapping mosaic
+  // of cards. Clicking a card routes to /tests/<name>/ for the detail page.
+  if (!selectedName) {
+    view().innerHTML = `
+      ${viewHead('tests', '03', 'Browse community-defined tests, their stage prompts, and the runs contributed against each.')}
+      ${tests.length
+        ? `<nav class="catalog-tabs mosaic" aria-label="tests">${tests.map((t) => testTabHTML(t, false)).join('')}</nav>`
+        : '<div class="panel"><div class="panel-body t-mute">no tests yet.</div></div>'}
+    `;
+    return;
+  }
 
-    <nav class="catalog-tabs" aria-label="tests">
-      ${tests.map((t) => testTabHTML(t, selected && t.name === selected.name)).join('')}
-    </nav>
-    <div id="testDetailSlot">${selected ? SKELETON : '<div class="panel"><div class="panel-body t-mute">no tests yet.</div></div>'}</div>
-  `;
-  if (!selected) return;
-
+  // /tests/<name>/: show only the detail page for the selected test (it
+  // lazy-loads tests/<name>.json and carries its own breadcrumb back to /tests/).
+  const selected = tests.find((t) => t.name === selectedName);
+  if (!selected) {
+    view().innerHTML = `<div class="panel"><div class="panel-body t-mute">test not found.</div></div>`;
+    return;
+  }
+  view().innerHTML = SKELETON;
   try {
     const test = await loadTest(selected.name);
     if (isStale(gen)) return;
-    const slot = $('#testDetailSlot');
-    if (slot) slot.innerHTML = testDetailHTML(test);
+    view().innerHTML = testDetailHTML(test);
     mountTestThemeChart(test);
   } catch (err) {
     if (isStale(gen)) return;
-    const slot = $('#testDetailSlot');
-    if (slot) slot.innerHTML = errorPanelHTML(err);
+    view().innerHTML = errorPanelHTML(err);
   }
 }
 
@@ -522,9 +527,10 @@ function testDetailHTML(t) {
     <div class="crumbs">
       <a href="/tests/">tests</a><span class="sep">/</span><span class="cur">${esc(t.name)}</span>
     </div>
+    ${viewHead(t.title, '', '')}
     <div class="panel">
       <div class="panel-head">
-        <span class="panel-title">${esc(t.title)}</span>
+        <span class="panel-title">test details</span>
         <span class="panel-actions">
           ${t.domain ? `<span class="pill">${esc(t.domain)}</span>` : ''}
           ${t.stack ? `<a class="pill magenta" href="/stacks/${encodeURIComponent(t.stack)}/">${esc(t.stack_name || t.stack)}</a>` : ''}
@@ -807,29 +813,36 @@ function mountCatalogActivity(activity) {
 
 async function renderCatalog(kind, selectedId, gen) {
   const items = kind.list();
-  const selected = items.find((x) => x.id === selectedId) || items[0];
 
-  view().innerHTML = `
-    ${viewHead(kind.title, kind.tag, kind.lead)}
+  // /<kind>/ (no selection): show only the list, as a wrapping mosaic of cards.
+  // Clicking a card routes to /<kind>/<id>/ for the detail page.
+  if (!selectedId) {
+    view().innerHTML = `
+      ${viewHead(kind.title, kind.tag, kind.lead)}
+      ${items.length
+        ? `<nav class="catalog-tabs mosaic" aria-label="${esc(kind.countPlur)}">${items.map((x) => catalogTabHTML(kind, x, false)).join('')}</nav>`
+        : '<div class="panel"><div class="panel-body t-mute">no entries yet.</div></div>'}
+    `;
+    return;
+  }
 
-    <nav class="catalog-tabs" aria-label="${esc(kind.countPlur)}">
-      ${items.map((x) => catalogTabHTML(kind, x, selected && x.id === selected.id)).join('')}
-    </nav>
-    <div id="catalogDetailSlot">${selected ? SKELETON : '<div class="panel"><div class="panel-body t-mute">no entries yet.</div></div>'}</div>
-  `;
-  if (!selected) return;
-
+  // /<kind>/<id>/: show only the detail page (it lazy-loads <kind>/<id>.json and
+  // carries its own hero header + breadcrumb back to /<kind>/).
+  const selected = items.find((x) => x.id === selectedId);
+  if (!selected) {
+    view().innerHTML = `<div class="panel"><div class="panel-body t-mute">${esc(kind.countSing)} not found.</div></div>`;
+    return;
+  }
+  view().innerHTML = SKELETON;
   try {
     const detail = await kind.load(selected.id);
     if (isStale(gen)) return;
-    const slot = $('#catalogDetailSlot');
-    if (slot) slot.innerHTML = catalogDetailHTML(kind, detail);
+    view().innerHTML = catalogDetailHTML(kind, detail);
     mountCatalogActivity(detail.activity);
     if (kind.crossChart) mountCrossBarChart('catalogCrossChart', detail.cross, kind.crossKey);
   } catch (err) {
     if (isStale(gen)) return;
-    const slot = $('#catalogDetailSlot');
-    if (slot) slot.innerHTML = errorPanelHTML(err);
+    view().innerHTML = errorPanelHTML(err);
   }
 }
 

@@ -940,6 +940,15 @@ td .pill { vertical-align: middle; }
 }
 .catalog-tabs::-webkit-scrollbar { height: 6px; }
 .catalog-tabs::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+/* Mosaic variant: wrap into a grid of equal-width cards instead of scrolling
+   sideways. A grid (vs flex-wrap) keeps a lone last card the same width as the
+   rest instead of stretching it across the row. */
+.catalog-tabs.mosaic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  overflow-x: visible;
+}
+.catalog-tabs.mosaic .catalog-tab { max-width: none; }
 .catalog-tab {
   flex: 0 0 auto;
   min-width: 150px;
