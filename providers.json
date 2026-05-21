@@ -178,8 +178,9 @@
   {
     "id": "self-hosted",
     "name": "Self-hosted",
-    "description": "You run the inference yourself, on your own hardware or rented infrastructure. Specify the inference engine in the `framework` field.",
-    "category": "self-hosted"
+    "description": "You run the inference yourself, on your own hardware or rented infrastructure.",
+    "category": "self-hosted",
+    "logo": "/logos/providers/self-hosted.svg"
   },
   {
     "id": "other",

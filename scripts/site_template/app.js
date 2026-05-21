@@ -660,10 +660,17 @@ const CATALOG_KINDS = {
 };
 
 function catalogTabHTML(kind, item, isActive) {
+  const initial = (item.name || item.id || '?').trim().charAt(0).toUpperCase();
+  const logoHTML = item.logo
+    ? `<img class="catalog-tab-logo" src="${esc(item.logo)}" alt="" data-initial="${esc(initial)}" loading="lazy" onerror="logoFallback(this)" />`
+    : '';
   return `<a class="catalog-tab ${isActive ? 'active' : ''}" href="/${kind.route}/${encodeURIComponent(item.id)}/">
-    <div class="catalog-tab-head">
-      <div class="catalog-tab-name">${esc(item.name || item.id)}${kind.hasCatalog && !item.in_catalog ? ' <span class="pill muted">unlisted</span>' : ''}</div>
-      ${item.category ? `<div class="catalog-tab-type">${esc(item.category)}</div>` : ''}
+    <div class="catalog-tab-id">
+      ${logoHTML}
+      <div class="catalog-tab-head">
+        <div class="catalog-tab-name">${esc(item.name || item.id)}${kind.hasCatalog && !item.in_catalog ? ' <span class="pill muted">unlisted</span>' : ''}</div>
+        ${item.category ? `<div class="catalog-tab-type">${esc(item.category)}</div>` : ''}
+      </div>
     </div>
     <div class="catalog-tab-badges">
       <span class="catalog-tab-badge">${item.run_count} run${item.run_count === 1 ? '' : 's'}</span>
