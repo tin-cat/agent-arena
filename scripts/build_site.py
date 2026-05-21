@@ -473,6 +473,7 @@ def build_leaderboard(loaded: dict[str, LoadedTest]) -> list[dict]:
             "agent": agent_name,
             "provider": provider,
             "model": model,
+            "model_id": _slug_model(model),                # URL-safe slug for /models/<id>/
             "run_count": len(runs),
             "stage_count": len(all_stages),
             "test_count": len({lr.test_name for lr in runs}),

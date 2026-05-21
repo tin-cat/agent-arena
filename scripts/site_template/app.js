@@ -457,9 +457,9 @@ function leaderboardTableHTML(rows) {
     </tr></thead>
     <tbody>${rows.map((r, i) => `
       <tr><td class="rank${i === 0 ? ' top' : ''}">${i + 1}</td>
-        <td>${esc(r.agent)}</td>
+        <td><a href="/agents/${encodeURIComponent(r.agent)}/">${esc(r.agent)}</a></td>
         <td><span class="pill muted">${esc(r.provider)}</span></td>
-        <td><b>${esc(r.model)}</b></td>
+        <td><a href="/models/${encodeURIComponent(r.model_id)}/"><b>${esc(r.model)}</b></a></td>
         <td style="min-width:200px">${bar(r.avg_rating_score)}</td>
         <td class="num">${fmtPct(r.success_rate)}</td>
         <td class="num">${r.run_count}</td>
@@ -850,7 +850,7 @@ function runsTableHTML(runs, opts = {}) {
     </tr></thead>
     <tbody>${runs.map((r) => `
       <tr class="clickable" onclick="navigate('/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
-        ${showTest ? `<td><a href="/tests/${esc(r.test_name)}/">${esc(r.test_name)}</a></td>` : ''}
+        ${showTest ? `<td>${esc(r.test_name)}</td>` : ''}
         <td><a class="author-inline" href="${esc(r.contributor_url)}" rel="noopener">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
         <td>${esc(r.agent)} · <b>${esc(r.model)}</b> <span class="pill muted">${esc(r.provider)}</span></td>
         <td>${ratingDots(r.stages, r.stages_total)}</td>
@@ -899,14 +899,12 @@ async function renderRunDetail(testName, runId, parentRoute, gen) {
     return;
   }
 
-  const back = parentRoute === 'runs' ? '/runs/' : `/tests/${testName}/`;
-  const backLabel = parentRoute === 'runs' ? 'all runs' : test.name;
   const settings = run.settings && Object.keys(run.settings).length ? run.settings : null;
   const hw = run.hardware;
 
   view().innerHTML = `
     <div class="crumbs">
-      <a href="${esc(back)}">${esc(backLabel)}</a><span class="sep">/</span>
+      <a href="/${esc(parentRoute || 'tests')}/">${esc(parentRoute === 'runs' ? 'all runs' : 'tests')}</a><span class="sep">/</span>
       <a href="/tests/${esc(testName)}/">${esc(testName)}</a><span class="sep">/</span>
       <span class="cur">${esc(runId)}</span>
     </div>
@@ -925,6 +923,7 @@ async function renderRunDetail(testName, runId, parentRoute, gen) {
         </div>
         <div class="panel-body">
           <div class="kv-grid">
+            <div><span class="k">test</span><span class="v"><a href="/tests/${esc(testName)}/">${esc(test.title || testName)}</a></span></div>
             <div><span class="k">contributor</span><span class="v"><a href="${esc(run.contributor_url)}" rel="noopener">${esc(run.contributor_handle)}</a></span></div>
             <div><span class="k">date</span><span class="v">${esc(run.date)}</span></div>
             <div><span class="k">agent</span><span class="v">${esc(run.agent)}${run.agent_plan ? ` <span class="t-mute">· ${esc(run.agent_plan)}</span>` : ''}</span></div>
