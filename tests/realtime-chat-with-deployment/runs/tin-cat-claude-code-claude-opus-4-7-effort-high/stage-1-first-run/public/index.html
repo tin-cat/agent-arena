@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Chat Room</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<!-- Name prompt: shown until the user picks a display name. -->
+	<div id="join-overlay" class="overlay">
+		<form id="join-form" class="join-card">
+			<h1>Join the chat</h1>
+			<p>Pick a display name to enter the room.</p>
+			<input
+				id="name-input"
+				type="text"
+				placeholder="Your name"
+				maxlength="40"
+				autocomplete="off"
+				required
+			>
+			<button type="submit">Join</button>
+		</form>
+	</div>
+
+	<div id="chat" class="chat hidden">
+		<header class="chat-header">
+			<span class="room-title">Shared Room</span>
+			<span id="connection-status" class="status">connecting…</span>
+		</header>
+
+		<ul id="messages" class="messages"></ul>
+
+		<form id="message-form" class="composer">
+			<input
+				id="message-input"
+				type="text"
+				placeholder="Type a message…"
+				maxlength="2000"
+				autocomplete="off"
+				disabled
+			>
+			<button id="send-button" type="submit" disabled>Send</button>
+		</form>
+	</div>
+
+	<script src="client.js"></script>
+</body>
+</html>

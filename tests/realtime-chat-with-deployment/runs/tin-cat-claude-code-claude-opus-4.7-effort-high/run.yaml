@@ -1,0 +1,23 @@
+contributor_url: https://github.com/tin-cat
+date: 2026-05-22
+agent:
+  name: claude-code
+  plan: max
+provider: anthropic
+model: claude-opus-4.7
+settings:
+  effort: high
+stages:
+  - id: stage-1-first-run
+    duration_sec: 123
+    tokens_in: 2700
+    tokens_out: 373100
+    cost_usd: 0.58
+    rating: excellent
+  - id: stage-2-rooms
+    duration_sec: 450
+    tokens_in: 3600
+    tokens_out: 36400
+    cost_usd: 2.5
+    rating: failed
+    notes: The node server crashes when another user enters the room and posts a message.

@@ -1,0 +1,10 @@
+node_modules/
+npm-debug.log*
+.DS_Store
+.env
+
+# SQLite database (chat history persists locally; not source).
+chat.db
+chat.db-journal
+chat.db-wal
+chat.db-shm
