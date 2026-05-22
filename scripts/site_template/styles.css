@@ -158,6 +158,7 @@ a:hover { text-decoration: underline; }
   animation: blink 1.05s steps(1) infinite;
 }
 .nav-item-action .nav-key { color: var(--magenta); text-shadow: var(--glow-magenta); font-size: 12px; }
+.nav-item-action .nav-key.nav-key-sword { font-size: 25px; line-height: 1.2; }
 .nav-item-action .nav-label { color: var(--magenta); font-weight: 600; }
 .nav-item-action:hover { background: rgba(255,106,213,.06); }
 .nav-item-action:hover .nav-label { color: var(--magenta); text-shadow: var(--glow-magenta); }
