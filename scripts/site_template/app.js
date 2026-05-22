@@ -355,7 +355,7 @@ function heroHTML() {
 
 const RATING_SCALE_ROWS = [
   ['excellent', '10.0', 'clean one-shot'],
-  ['good',      '7.5',  'minor follow-up'],
+  ['good',      '7.5',  'minor flaws'],
   ['partial',   '4.0',  'major gaps'],
   ['failed',    '0.0',  'could not complete'],
 ];

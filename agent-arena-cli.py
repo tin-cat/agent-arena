@@ -226,8 +226,8 @@ RATING_GLYPH = {
     "failed":    "[red]●[/]",
 }
 RATING_BLURB = {
-    "excellent": "clean one-shot, no follow-up needed",
-    "good":      "completed, minor follow-up needed",
+    "excellent": "clean one-shot, fully met the prompt",
+    "good":      "completed, but with minor flaws",
     "partial":   "major requirements unmet",
     "failed":    "could not be completed",
 }

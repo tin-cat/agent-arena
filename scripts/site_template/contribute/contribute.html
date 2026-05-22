@@ -118,14 +118,23 @@ git push origin main</pre>
 
         <div>Find the test you want to run in the <a href="/tests">tests section</a>, you'll find the prompts you need to feed to your agent there.</div>
 
-        <ul>
-            <li>Run each stage in order</li>
-            <li>If you're using additional MCP servers, skills, custom subagents, hooks, or similar beyond the agent's defaults, document it by adding them to <code>settings</code> (e.g. <code>mcps=linear,sentry</code> / <code>skills=simplify,review</code>).</li>
-            <li>Copy and paste each stage prompt <b>exactly as written</b>.</li>
-            <li>Once a stage finishes, take note of the usage and close your agent.</li>
-            <li>Each stage should be run after a fresh start of your agent, on the code left by the previous stage.</li>
+        <div class="note magenta">
+          <span class="note-tag">don't help your agent</span>
+          You're scoring the agent, not yourself. Feed each stage's prompt <b>exactly as written</b> and let the agent run on its own. <b>Do not add prompts of your own, and do not fix, nudge, or clean up its mistakes.</b> Whatever the agent leaves behind is what the next stage builds on, flaws and all. That's the whole point: we're measuring what the setup does unaided.
+        </div>
 
+        <ul>
+            <li>Run each stage in order.</li>
+            <li>If you're using additional MCP servers, skills, custom subagents, hooks, or similar beyond the agent's defaults, document it by adding them to <code>settings</code> (e.g. <code>mcps=linear,sentry</code> / <code>skills=simplify,review</code>).</li>
+            <li>Copy and paste each stage prompt <b>exactly as written</b>. One prompt per stage, nothing more.</li>
+            <li>Once a stage finishes, take note of the usage, rate the result, and close your agent.</li>
+            <li>Each stage should be run after a fresh start of your agent, on the code left by the previous stage, mistakes included.</li>
         </ul>
+
+        <div class="note">
+          <span class="note-tag">stopping early is fine</span>
+          Later stages pile new work on top of the previous stage's code, so if a stage comes out so broken that continuing would only stack good work on a broken foundation, just stop there. Rate the stages you actually ran and submit those, a short run is still useful data. Only include the stages you ran, no empty placeholders.
+        </div>
 
     </div>
   </section>
@@ -178,22 +187,22 @@ git push origin main</pre>
         <div class="rating-card" style="--c: {{ rating_color.excellent }}">
           <div class="rating-card-dot"></div>
           <div class="rating-card-name">excellent</div>
-          <div class="rating-card-blurb">Stage completed cleanly on the original prompt with no follow-up prompting needed.</div>
+          <div class="rating-card-blurb">The agent fully met the prompt in one shot. Clean, correct, nothing important missing.</div>
         </div>
         <div class="rating-card" style="--c: {{ rating_color.good }}">
           <div class="rating-card-dot"></div>
           <div class="rating-card-name">good</div>
-          <div class="rating-card-blurb">Stage completed but required minor follow-up prompting to fix issues.</div>
+          <div class="rating-card-blurb">The agent completed the stage, but the result has minor flaws or rough edges.</div>
         </div>
         <div class="rating-card" style="--c: {{ rating_color.partial }}">
           <div class="rating-card-dot"></div>
           <div class="rating-card-name">partial</div>
-          <div class="rating-card-blurb">Stage left major requirements unmet, even after follow-up.</div>
+          <div class="rating-card-blurb">The agent left major requirements of the prompt unmet.</div>
         </div>
         <div class="rating-card" style="--c: {{ rating_color.failed }}">
           <div class="rating-card-dot"></div>
           <div class="rating-card-name">failed</div>
-          <div class="rating-card-blurb">Stage could not be completed.</div>
+          <div class="rating-card-blurb">The agent could not complete the stage at all.</div>
         </div>
       </div>
     </div>
