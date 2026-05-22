@@ -1,0 +1,149 @@
+contributor_url: https://github.com/tin-cat   # the URL that identifies the author of this test on the site
+name: advanced-event-ticketing-api
+title: DDD event ticketing platform
+description: |
+  A backend-only event ticketing platform ("Frontstage") built with PHP and
+  Symfony using Domain-Driven Design and a message-consumer architecture. The
+  catalog of events and seating lives in PostgreSQL; time-limited seat holds and
+  fast availability read models live in Redis; order fulfillment (payment,
+  ticket issuance, notifications) runs asynchronously across bounded contexts
+  over RabbitMQ (AMQP) using a transactional outbox and idempotent consumers.
+  The test exercises hexagonal architecture, CQRS, a Dockerised dev environment,
+  and correctness under concurrency (no overselling).
+
+  This is a deliberately technically-prompted test: the prompts come from a
+  knowledgeable author who tells the agent what to build but also pins down a
+  precise architecture and technology definition, rather than leaving those
+  choices to the agent. It measures how well a stack executes against an
+  opinionated, expert specification.
+domain: backend
+stack: php-symfony
+
+stages:
+  - id: stage-1-domain-skeleton
+    theme: bootstrap
+    prompt: |
+      Build the backend for an event ticketing platform called "Frontstage". It is API-only: a JSON/REST HTTP API with no user interface. Use PHP and Symfony.
+
+      Architecture, applied from the start because the project will grow:
+
+      - Hexagonal architecture (ports and adapters). The domain layer must contain no framework or infrastructure code: no Doctrine annotations, no Symfony classes, no HTTP. The domain depends only on its own interfaces (ports). Infrastructure adapters (Doctrine, HTTP controllers, etc.) live in an outer layer and implement those ports. Symfony's container wires adapters to ports.
+      - Domain-Driven Design tactical patterns: aggregates, entities, value objects, and repository interfaces defined in the domain. Money, dates, and identifiers are value objects, never primitives.
+      - Bounded contexts are organised as separate top-level modules, each with its own domain / application / infrastructure folders. This stage introduces the first context: Catalog.
+      - CQRS: commands and queries travel on separate buses (use Symfony Messenger with a synchronous transport for now). Commands mutate state and return nothing meaningful; queries never mutate.
+
+      Catalog context for this stage:
+
+      - An Organizer creates an Event (title, description, starts-at datetime in UTC, and a Venue). A Venue has a seating definition: named sections, each with rows and numbered seats, OR a general-admission capacity. Every seat belongs to a price tier with a price.
+      - An Event is created as a draft and can later be published. Only published events are browsable by customers.
+
+      Persistence: PostgreSQL via Doctrine, with generated migrations. Doctrine entities/mappings are infrastructure adapters, kept out of the domain.
+
+      Endpoints for this stage: create an event with its seating and price tiers; publish an event; fetch a single event with its seating map and per-seat availability; list published events.
+
+      Set up an automated test suite from the start, since the codebase will grow. Use PHPUnit. The hexagonal layering makes this natural: write fast unit tests for the domain (value objects rejecting invalid states, aggregate behaviour) with no infrastructure, and functional tests that drive the HTTP API end to end (create an event, publish it, read back its seating and availability). Provide a single command to run the whole suite (a `composer test` script or a Makefile target).
+
+      Add a README.md documenting the architecture, the bounded-context layout, how the layers depend on each other, and how to run the tests.
+
+  - id: stage-2-docker-dev-env
+    builds_on: stage-1-domain-skeleton
+    theme: infrastructure
+    prompt: |
+      Add a complete Docker-based development environment so a contributor can clone the repository and bring the whole system up with a single command.
+
+      Provide a docker compose setup with these services:
+
+      - The Symfony application running on PHP-FPM, built from a Dockerfile that installs the required PHP extensions and Composer dependencies.
+      - A web server in front of PHP-FPM serving the API.
+      - PostgreSQL for persistence.
+      - RabbitMQ as the AMQP broker, with its management UI exposed.
+      - Redis.
+
+      Wire the application to this environment:
+
+      - Configure Symfony Messenger with an AMQP (RabbitMQ) transport, ready to carry asynchronous messages in later stages, alongside the synchronous command/query buses.
+      - Configure Redis as the Symfony cache adapter and as the backend for the Lock component.
+      - All connection settings come from environment variables, with no secrets baked into images.
+
+      Make startup turnkey: a single command (a Makefile target or a compose entrypoint) builds the images, starts every service, waits for dependencies to be healthy (use healthchecks), runs database migrations, and leaves the API serving requests. Document the commands to start, stop, and inspect the environment in the README, including how to reach the RabbitMQ management UI.
+
+      Make the test suite runnable inside this environment: a single command runs the full PHPUnit suite in the containers against a dedicated, isolated test database. Document that command in the README.
+
+  - id: stage-3-holds-and-orders
+    builds_on: stage-2-docker-dev-env
+    theme: features
+    prompt: |
+      Add the seat-holding and ordering flow across two new bounded contexts: Reservations and Ordering.
+
+      Reservations context:
+
+      - When a customer selects one or more specific seats (or a quantity of tickets) for an event, the system places a time-limited hold on them, default 10 minutes. While held, those seats are not available to anyone else.
+      - Holds are tracked in Redis with a TTL so they expire automatically; when a hold expires the seats become available again with no manual cleanup. Use the Redis-backed Lock component to make placing a hold on a given seat atomic, so two simultaneous requests can never both hold the same seat.
+      - A customer can release a hold early.
+
+      Ordering context:
+
+      - A customer converts an active hold into an Order. Placing the order consumes the hold and marks those seats as sold. An order has a total computed from the seats' price tiers (Money value object) and a status.
+      - Once seats are sold they are no longer available and the hold can no longer be used.
+
+      CQRS read side: introduce a seat-availability read model that answers "what is available for this event" quickly, reflecting holds and sales, kept separate from the write model.
+
+      Endpoints: create a hold for an event; release a hold; place an order from a hold; fetch an order; fetch current availability for an event. Keep the hexagonal boundaries: Redis access sits behind domain ports, never called directly from the domain.
+
+      Extend the test suite to cover this flow: a hold makes seats unavailable; an expired hold frees them again; two concurrent attempts to hold the same seat cannot both succeed; placing an order from a hold marks the seats sold and consumes the hold; a consumed or released hold can no longer be ordered.
+
+  - id: stage-4-async-fulfillment
+    builds_on: stage-3-holds-and-orders
+    theme: extension
+    prompt: |
+      Make order fulfillment fully asynchronous and event-driven over RabbitMQ. The work of fulfilling it happens in background consumers.
+
+      Introduce these contexts and flow as event-driven choreography:
+
+      - When an order is placed, the Ordering context publishes an OrderPlaced domain event.
+      - A Payments context consumes it, authorises payment (simulate a payment gateway, including occasional failures), and publishes PaymentAuthorized or PaymentDeclined.
+      - A Ticketing context consumes PaymentAuthorized, issues a ticket per seat with a unique, verifiable code (e.g. a signed token suitable for a QR code), and publishes TicketsIssued.
+      - A Notifications context consumes TicketsIssued and sends a confirmation (log it, write it to a maildir or use something like mailhog; no real email needed). On PaymentDeclined the order is cancelled and its seats released. The client gets notified.
+
+      Reliability requirements:
+
+      - Transactional outbox: domain events are written to an outbox table in the same database transaction as the aggregate change, then relayed to RabbitMQ by a separate relay process. An event is never lost even if the broker is momentarily unavailable, and is never published for a transaction that rolled back.
+      - Idempotent consumers: assume at-least-once delivery. Every consumer must be safe to run on a redelivered or duplicated message (dedupe by message id), so retries never double-charge or double-issue tickets. Configure retries with backoff and a dead-letter queue for poison messages.
+
+      The Symfony Messenger consumers run as worker processes; add them to the Docker environment so they start with the stack. Expose an endpoint to fetch an order's fulfillment status (placed, paid, ticketed, declined, cancelled).
+
+      Extend the test suite to cover the fulfillment guarantees: the happy path drives an order from placed to ticketed; a declined payment cancels the order and releases its seats; replaying or duplicating a message through a consumer does not issue a second ticket or charge twice (idempotency); the outbox publishes committed events and never publishes events from a transaction that rolled back.
+
+  - id: stage-5-projections-and-concurrency
+    builds_on: stage-4-async-fulfillment
+    theme: performance
+    prompt: |
+      Optimise the hot read paths and prove the system does not oversell under load.
+
+      Read-model projections:
+
+      - Build Redis-backed projections for the heavily read data: event listings and per-event seat availability. Projections are updated by consuming the domain events flowing through RabbitMQ (event published, hold placed/released/expired, order placed, etc.), so that the public read endpoints (list events, get availability) are served entirely from Redis and never touch PostgreSQL on the hot path.
+      - Handle projection rebuilds: provide a command that rebuilds a projection from the source of truth, and make projection updates idempotent so replays are safe.
+
+      Concurrency and correctness:
+
+      - Guarantee no overselling when many customers compete for the same seats at once, combining the Redis locks from earlier with optimistic concurrency (a version/aggregate check) on the seat-inventory write model so a lost update can never sell a seat twice.
+      - Provide a seeding command that creates a large catalog (many published events, large venues with thousands of seats) and a load script that fires many concurrent hold-and-order attempts against the same popular event, then verifies afterwards that the number of sold seats never exceeds capacity and no seat was sold twice.
+
+      Wire the no-overselling assertion into the test suite as well, as an integration test that drives concurrent holds/orders and asserts capacity is never exceeded, so a regression is caught automatically. Document how to run the seeder and the concurrency check, and what numbers to expect.
+
+  - id: stage-6-api-hardening
+    builds_on: stage-5-projections-and-concurrency
+    theme: security
+    prompt: |
+      Harden the API and the messaging layer for untrusted clients.
+
+      - Authentication and authorization: protect the API with token-based auth (JWT or signed API tokens) and distinguish roles. Organizers may create and publish events; customers may hold seats and place orders; availability and event browsing are public. Enforce that a customer can only act on their own holds and orders.
+      - Idempotency keys: mutating endpoints that must not be applied twice, especially placing an order, accept an Idempotency-Key header. A retried request with the same key returns the original result instead of creating a second order or charging again. Store keys in Redis.
+      - Rate limiting: apply Redis-backed rate limits per client/token to hold and order creation to prevent abuse and inventory hoarding.
+      - Input validation: validate and constrain every request payload at the boundary; reject malformed or oversized input with proper HTTP status codes; ensure value objects reject invalid states.
+      - Secrets and the broker: confirm no secrets live in images or the repo, and that the RabbitMQ consumers reject and dead-letter malformed or unauthenticated messages rather than crashing the worker.
+
+      Extend the test suite to cover the hardening: unauthenticated requests are rejected; a customer cannot act on another customer's holds or orders; an organizer-only action is forbidden for a customer; replaying a request with the same Idempotency-Key returns the original order rather than creating a second one; exceeding the rate limit is rejected; malformed or oversized payloads are rejected with the right status codes.
+
+      Update the README with the auth flow, how to obtain a token, and the idempotency and rate-limit behaviour.
