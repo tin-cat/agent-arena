@@ -871,7 +871,7 @@ function runsTableHTML(runs, opts = {}) {
     <tbody>${runs.map((r) => `
       <tr class="clickable" onclick="navigate('/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
         ${showTest ? `<td>${esc(r.test_name)}</td>` : ''}
-        <td><a class="author-inline" href="${esc(r.contributor_url)}" rel="noopener">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
+        <td><a class="author-inline" href="/contributors/${encodeURIComponent(r.contributor_handle)}/">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
         <td>${esc(r.agent)} · <b>${esc(r.model)}</b> <span class="pill muted">${esc(r.provider)}</span></td>
         <td>${ratingDots(r.stages, r.stages_total)}</td>
         <td style="min-width:170px">${bar(r.avg_rating_score)}</td>
@@ -944,7 +944,7 @@ async function renderRunDetail(testName, runId, parentRoute, gen) {
         <div class="panel-body">
           <div class="kv-grid">
             <div><span class="k">test</span><span class="v"><a href="/tests/${esc(testName)}/">${esc(test.title || testName)}</a></span></div>
-            <div><span class="k">contributor</span><span class="v"><a href="${esc(run.contributor_url)}" rel="noopener">${esc(run.contributor_handle)}</a></span></div>
+            <div><span class="k">contributor</span><span class="v"><a class="author-inline" href="/contributors/${encodeURIComponent(run.contributor_handle)}/">${run.contributor_avatar ? `<img class="avatar-thumb" src="${esc(run.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(run.contributor_handle)}</span></a></span></div>
             <div><span class="k">date</span><span class="v">${esc(run.date)}</span></div>
             <div><span class="k">agent</span><span class="v">${esc(run.agent)}${run.agent_plan ? ` <span class="t-mute">· ${esc(run.agent_plan)}</span>` : ''}</span></div>
             <div><span class="k">model</span><span class="v">${esc(run.model)}</span></div>
