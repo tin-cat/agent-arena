@@ -15,9 +15,9 @@ stages:
     cost_usd: 0.58
     rating: excellent
   - id: stage-2-rooms
-    duration_sec: 450
-    tokens_in: 3600
-    tokens_out: 36400
-    cost_usd: 2.5
-    rating: failed
-    notes: The node server crashes when another user enters the room and posts a message.
+    duration_sec: 317
+    tokens_in: 3500
+    tokens_out: 26700
+    cost_usd: 1.88
+    rating: good
+    notes: Currently existing rooms are not shown, you must know the room name to join.
