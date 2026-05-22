@@ -193,6 +193,16 @@ function navigate(path) {
 }
 window.navigate = navigate;
 
+// Row-level navigation for clickable table rows. Yields to inner links so that
+// clicking an <a> inside the row (e.g. a contributor cell) follows that link
+// instead of also firing the row's destination — the click delegator above
+// handles the link itself.
+function rowNav(e, path) {
+  if (e.target.closest('a')) return;
+  navigate(path);
+}
+window.rowNav = rowNav;
+
 // Each route() call gets a monotonically-increasing token. Async handlers check
 // `currentGen()` before mutating the DOM to avoid stale renders when the user
 // navigates again before a fetch resolves.
@@ -690,7 +700,7 @@ function catalogDetailHTML(kind, d) {
     : `<span class="catalog-logo fallback">${esc(initial)}</span>`;
 
   const crossRows = d.cross.map((c) => `
-    <tr class="clickable" onclick="navigate('/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}/')">
+    <tr class="clickable" onclick="rowNav(event, '/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}/')">
       <td><a href="/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}/"><code>${esc(c[kind.crossKey])}</code></a></td>
       <td class="num">${c.run_count}</td>
       <td class="num">${c.stage_count}</td>
@@ -698,7 +708,7 @@ function catalogDetailHTML(kind, d) {
     </tr>`).join('');
 
   const testRows = d.tests.map((t) => `
-    <tr class="clickable" onclick="navigate('/tests/${encodeURIComponent(t.test_name)}/')">
+    <tr class="clickable" onclick="rowNav(event, '/tests/${encodeURIComponent(t.test_name)}/')">
       <td><a href="/tests/${encodeURIComponent(t.test_name)}/">${esc(t.test_name)}</a></td>
       <td class="t-mute">${esc(t.test_title)}</td>
       <td class="num">${t.run_count}</td>
@@ -759,7 +769,7 @@ function catalogDetailHTML(kind, d) {
         <table>
           <thead><tr><th>stack</th><th class="num">runs</th><th class="num">stages</th><th>avg score</th></tr></thead>
           <tbody>${d.stacks.map((s) => `
-            <tr class="clickable" onclick="navigate('/stacks/${encodeURIComponent(s.stack)}/')">
+            <tr class="clickable" onclick="rowNav(event, '/stacks/${encodeURIComponent(s.stack)}/')">
               <td><a href="/stacks/${encodeURIComponent(s.stack)}/">${esc(s.stack_name || s.stack)}</a></td>
               <td class="num">${s.run_count}</td>
               <td class="num">${s.stage_count}</td>
@@ -869,7 +879,7 @@ function runsTableHTML(runs, opts = {}) {
       <th class="num">cost</th><th class="num">time</th><th class="num">date</th>
     </tr></thead>
     <tbody>${runs.map((r) => `
-      <tr class="clickable" onclick="navigate('/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
+      <tr class="clickable" onclick="rowNav(event, '/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
         ${showTest ? `<td>${esc(r.test_name)}</td>` : ''}
         <td><a class="author-inline" href="/contributors/${encodeURIComponent(r.contributor_handle)}/">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
         <td>${esc(r.agent)} · <b>${esc(r.model)}</b> <span class="pill muted">${esc(r.provider)}</span></td>
@@ -1082,7 +1092,7 @@ function recentContribHTML(rows) {
   return `<table>
     <thead><tr><th>date</th><th>handle</th><th>test · run</th><th>agent · model</th></tr></thead>
     <tbody>${rows.map((c) => `
-      <tr class="clickable" onclick="navigate('/tests/${esc(c.test_name)}/runs/${esc(c.run_id)}/')">
+      <tr class="clickable" onclick="rowNav(event, '/tests/${esc(c.test_name)}/runs/${esc(c.run_id)}/')">
         <td class="t-mute">${esc(c.date)}</td>
         <td><a href="/contributors/${encodeURIComponent(c.handle)}/">${esc(c.handle)}</a></td>
         <td><a href="/tests/${esc(c.test_name)}/">${esc(c.test_name)}</a> · <code>${esc(c.run_id)}</code></td>
@@ -1161,7 +1171,7 @@ async function renderContributorProfile(handle, gen) {
           <table>
             <thead><tr><th>test</th><th class="num">runs</th></tr></thead>
             <tbody>${[...tests.values()].sort((a, b) => b.count - a.count).map((t) => `
-              <tr class="clickable" onclick="navigate('/tests/${esc(t.name)}/')">
+              <tr class="clickable" onclick="rowNav(event, '/tests/${esc(t.name)}/')">
                 <td><a href="/tests/${esc(t.name)}/">${esc(t.title)}</a> <span class="pill muted">${esc(t.name)}</span></td>
                 <td class="num">${t.count}</td>
               </tr>`).join('')}
@@ -1224,7 +1234,7 @@ async function renderContributorProfile(handle, gen) {
             <table>
               <thead><tr><th>test</th><th>domain</th><th class="num">stages</th><th class="num">runs</th><th class="num">top score</th></tr></thead>
               <tbody>${authored.map((t) => `
-                <tr class="clickable" onclick="navigate('/tests/${esc(t.name)}/')">
+                <tr class="clickable" onclick="rowNav(event, '/tests/${esc(t.name)}/')">
                   <td><a href="/tests/${esc(t.name)}/">${esc(t.title)}</a> <span class="pill muted">${esc(t.name)}</span></td>
                   <td>${t.domain ? `<span class="pill">${esc(t.domain)}</span>` : '<span class="t-mute">—</span>'}</td>
                   <td class="num">${t.stages_total}</td>
