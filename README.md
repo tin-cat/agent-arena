@@ -67,5 +67,8 @@ You can always invoke Python directly with `py agent-arena-cli.py …` or `pytho
 ## Contribute
 Please feel free to contribute your tests to this repository. You can either contribute entire new tests, or your runs of existing tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
+## Honest about what we are
+AgentArena aims to be a relaxed, accurate benchmark of real tasks, not a precise, controlled lab study. If you're after rigorous, technical benchmarks, check the [AI Agent Benchmark Compendium](https://github.com/philschmid/ai-agent-benchmark-compendium), a curated list worth your time.
+
 ## About
 Reach me at [@lorenzoherrera](https://twitter.com/lorenzoherrera) ❤️ [tin.cat](https://tin.cat)

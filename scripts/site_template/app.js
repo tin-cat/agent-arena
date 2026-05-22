@@ -340,6 +340,16 @@ function renderOverview() {
         </div>
       </div>
     </div>` : ''}
+
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">looking for serious benchmarks?</span></div>
+      <div class="panel-body">
+        <div class="note">
+          <span class="note-tag">honest about what we are</span>
+          AgentArena is a relaxed, community-run benchmark of real, multi-stage tasks contributed by regular people. It aims to be accurate and useful, not a precise, controlled lab study. If you need rigorous, technical benchmarks, check the <a href="https://github.com/philschmid/ai-agent-benchmark-compendium" rel="noopener">AI Agent Benchmark Compendium</a>, a curated list worth your time.
+        </div>
+      </div>
+    </div>
   `;
 
   mountScatter();
