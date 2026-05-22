@@ -13,7 +13,6 @@ tests/rest-api-todo
 tests/url-shortener
 tests/weather-dashboard
 tests/expense-tracker
-tests/realtime-chat
 tests/tower-defense
 tests/image-resizer
 tests/kanban-board
