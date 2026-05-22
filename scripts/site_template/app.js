@@ -396,6 +396,7 @@ function mountRatingScale() {
 // excluded — they still show per-run rating dots where the legend is useful.
 const RATING_SCALE_HIDDEN_PATHS = [
   /^\/?$/, /^\/overview\/?$/,
+  /^\/tests\/?$/,
   /^\/leaderboard\/?$/,
   /^\/contributors\/?$/,
   /^\/hardware\/?$/,
