@@ -17,16 +17,16 @@ stages:
     builds_on: stage-1-first-run
     theme: features
     prompt: |
-      Add named rooms: the URL hash (#room-name) selects the room, and messages are scoped to that room. Show the current room name and let users switch rooms without reloading. Persist messages per room to SQLite so history survives a server restart (keep the last 200 per room).
+      Add named rooms: the URL hash (#room-name) selects the room, and messages are scoped to that room. Display a list of all rooms currently with active users. Show the current room name and let users switch rooms without reloading. Persist messages per room to SQLite so history survives a server restart (keep the last 200 per room).
 
-  - id: stage-3-extra-features
+  - id: stage-3-private-messages
     builds_on: stage-2-rooms
-    theme: features
+    theme: refactor
     prompt: |
-      Display a list of all rooms currently with active users. Add presence: show a live list of who is in the current room, broadcast join/leave system messages, and show a "typing…" indicator. Allow user-to-user private message rooms.
+      Allow user-to-user private message rooms.
 
   - id: stage-4-security
-    builds_on: stage-3-extra-features
+    builds_on: stage-3-private-messages
     theme: security
     prompt: |
       Add lightweight moderation: a per-room rate limit (max 5 messages / 10s per user), a configurable banned-word filter that masks matches, and a message length cap. Sanitize all message content to prevent HTML, XSS, SQL injection and other typical attack vectors like CSRF.
