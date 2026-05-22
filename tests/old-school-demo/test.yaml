@@ -1,6 +1,6 @@
 contributor_url: https://github.com/tin-cat   # the URL that identifies the author of this test on the site
 name: old-school-demo
-title: An old-school demoscene demo
+title: Old-school demo
 description: |
   A 90s-style demoscene production built with Three.js: a single, self-running
   show of chained graphical effects synced to a MOD-like background tune. Every

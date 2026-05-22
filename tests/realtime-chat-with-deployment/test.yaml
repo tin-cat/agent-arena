@@ -1,6 +1,6 @@
 contributor_url: https://github.com/tin-cat
 name: realtime-chat-with-deployment
-title: A real-time chat app with automated deployment
+title: Chat app with automated deployment
 description: |
   A WebSocket-based chat application with multiple rooms, presence, and basic moderation. Builds from a single shared room up to a moderated multi-room app. Includes automated deployment to AWS for a complete development-to-live workflow.
 domain: full-stack-web

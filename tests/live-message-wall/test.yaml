@@ -1,6 +1,6 @@
 contributor_url: https://github.com/tin-cat   # the URL that identifies the author of this test on the site
 name: live-message-wall
-title: A live message wall
+title: Live message wall
 description: |
   A real-time, anonymous message wall web app with a TUI-inspired aesthetic.
   Visitors can post messages without logging in, and the wall updates live as

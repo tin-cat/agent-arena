@@ -1,6 +1,6 @@
 contributor_url: https://github.com/anthony   # the URL that identifies the author of this test on the site
 name: snake-game
-title: A browser Snake game
+title: Snake game
 description: |
   The classic Snake arcade game implemented as a single-page web app.
   Later stages add progression, sound, and a local leaderboard, then
