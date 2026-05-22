@@ -1888,9 +1888,6 @@ def _cross_check_run(test_name: str, run_id: str, valid_stage_ids: set[str]) -> 
         if s.id in seen:
             errors.append((path, f"stage '{s.id}' appears more than once"))
         seen.add(s.id)
-        stage_dir = path.parent / s.id
-        if not stage_dir.is_dir():
-            errors.append((path, f"missing source directory for stage '{s.id}'"))
     return errors
 
 
