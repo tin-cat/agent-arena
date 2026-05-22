@@ -1,6 +1,6 @@
 contributor_url: https://github.com/tin-cat   # the URL that identifies the author of this test on the site
 name: advanced-event-ticketing-api
-title: DDD event ticketing platform
+title: Advanced event ticketing API
 description: |
   A backend-only event ticketing platform ("Frontstage") built with PHP and
   Symfony using Domain-Driven Design and a message-consumer architecture. The
