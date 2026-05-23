@@ -299,7 +299,7 @@ function renderOverview() {
 
     <div class="split-2">
       <div class="panel">
-        <div class="panel-head"><span class="panel-title">cost vs quality</span><span class="panel-actions t-mute">${DATA.scatter.length} model${DATA.scatter.length === 1 ? '' : 's'} · bubble = run count</span></div>
+        <div class="panel-head"><span class="panel-title">model cost vs quality</span><span class="panel-actions t-mute">size = score · <span style="color:#5ad1ff">cheap</span> → <span style="color:#ff6ad5">expensive</span></span></div>
         <div class="panel-body"><div class="chart-box"><canvas id="scatterChart"></canvas></div></div>
       </div>
       <div class="panel">
@@ -1503,57 +1503,338 @@ function mountContribRatingChart(p) {
    Charts
    ════════════════════════════════════════════════════════════════════════ */
 
+// Cache of <img> elements keyed by URL — Chart.js plugins draw synchronously,
+// so logos must already be decoded by the time the bubble draws. Images that
+// haven't finished loading trigger a single chart update once they do.
+const _logoImgCache = new Map();
+function _getLogoImg(url, onLoad) {
+  if (!url) return null;
+  let img = _logoImgCache.get(url);
+  if (img) return img;
+  img = new Image();
+  img.crossOrigin = 'anonymous';
+  img._loaded = false;
+  img.onload  = () => { img._loaded = true; onLoad && onLoad(); };
+  img.onerror = () => { img._broken = true; };
+  img.src = url;
+  _logoImgCache.set(url, img);
+  return img;
+}
+
+// Returns an offscreen canvas containing `img` recolored to `tintColor` while
+// preserving its alpha. Used to flip the light-grey catalog logos to a dark
+// fill when they're placed on a bright tile background. Cached per (img, tint).
+const _tintedLogoCache = new Map();
+function _tintedLogo(img, tintColor) {
+  if (!img || !img._loaded) return null;
+  const key = img.src + '|' + tintColor;
+  const cached = _tintedLogoCache.get(key);
+  if (cached) return cached;
+  const w = img.naturalWidth  || 64;
+  const h = img.naturalHeight || 64;
+  const off = document.createElement('canvas');
+  off.width  = w;
+  off.height = h;
+  const c = off.getContext('2d');
+  c.drawImage(img, 0, 0, w, h);
+  c.globalCompositeOperation = 'source-in';
+  c.fillStyle = tintColor;
+  c.fillRect(0, 0, w, h);
+  _tintedLogoCache.set(key, off);
+  return off;
+}
+
+// Blend between two #RRGGBB colors in OKLCH (Björn Ottosson's perceptually
+// uniform space). Compared to linear-RGB lerp, OKLCH keeps both chroma and
+// lightness consistent through the middle, so a cyan → magenta gradient stays
+// vivid the whole way instead of dipping through a dull grey-purple.
+function _srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function _linearToSrgb(c) {
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+function _srgbToOklab(r, g, b) {
+  const lr = _srgbToLinear(r), lg = _srgbToLinear(g), lb = _srgbToLinear(b);
+  const l = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+  const m = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+  const s = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+  const l_ = Math.cbrt(l), m_ = Math.cbrt(m), s_ = Math.cbrt(s);
+  return {
+    L: 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+    a: 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+    b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+  };
+}
+function _oklabToSrgb(L, a, b) {
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
+  return {
+    r: Math.max(0, Math.min(1, _linearToSrgb( 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s))),
+    g: Math.max(0, Math.min(1, _linearToSrgb(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s))),
+    b: Math.max(0, Math.min(1, _linearToSrgb(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s))),
+  };
+}
+function _lerpHex(c1, c2, t) {
+  t = Math.max(0, Math.min(1, t));
+  const r1 = parseInt(c1.slice(1, 3), 16) / 255;
+  const g1 = parseInt(c1.slice(3, 5), 16) / 255;
+  const b1 = parseInt(c1.slice(5, 7), 16) / 255;
+  const r2 = parseInt(c2.slice(1, 3), 16) / 255;
+  const g2 = parseInt(c2.slice(3, 5), 16) / 255;
+  const b2 = parseInt(c2.slice(5, 7), 16) / 255;
+  const lab1 = _srgbToOklab(r1, g1, b1);
+  const lab2 = _srgbToOklab(r2, g2, b2);
+  // Convert both to OKLCh so we can interpolate hue along the shortest arc
+  // (otherwise cyan→magenta could dip through grey at the chroma-zero pole).
+  const C1 = Math.hypot(lab1.a, lab1.b);
+  const C2 = Math.hypot(lab2.a, lab2.b);
+  const h1 = Math.atan2(lab1.b, lab1.a);
+  let dh = Math.atan2(lab2.b, lab2.a) - h1;
+  if (dh >  Math.PI) dh -= 2 * Math.PI;
+  if (dh < -Math.PI) dh += 2 * Math.PI;
+  const L = lab1.L + (lab2.L - lab1.L) * t;
+  const C = C1 + (C2 - C1) * t;
+  const h = h1 + dh * t;
+  const rgb = _oklabToSrgb(L, C * Math.cos(h), C * Math.sin(h));
+  return `rgb(${Math.round(rgb.r * 255)}, ${Math.round(rgb.g * 255)}, ${Math.round(rgb.b * 255)})`;
+}
+
+// Trace a rounded-rect path on the given context. roundRect is widely shipped
+// (Chrome 99+, Safari 16+, Firefox 113+) but we draw the arcs by hand so older
+// browsers don't fall off.
+function _roundRectPath(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+}
+
+// Greedy word-wrap to `maxWidth` (in the current ctx font), capped at
+// `maxLines`. The last line gets an ellipsis if it would have overflowed.
+// Assumes ctx.font is set by the caller.
+function _wrapText(ctx, text, maxWidth, maxLines = 2) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let current = '';
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const test = current ? current + ' ' + w : w;
+    if (ctx.measureText(test).width <= maxWidth) {
+      current = test;
+    } else {
+      if (current) lines.push(current);
+      current = w;
+      if (lines.length === maxLines - 1) {
+        // We're on the last allowed line — pack the rest in with ellipsis if
+        // they don't fit.
+        const rest = [w, ...words.slice(i + 1)].join(' ');
+        if (ctx.measureText(rest).width <= maxWidth) {
+          current = rest;
+        } else {
+          let truncated = rest;
+          while (truncated.length && ctx.measureText(truncated + '…').width > maxWidth) {
+            truncated = truncated.slice(0, -1);
+          }
+          current = truncated + '…';
+        }
+        break;
+      }
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 function mountScatter() {
   if (!DATA.scatter.length) return;
 
-  // Bubble size encodes total runs (more runs = more confidence in the point).
-  const maxRuns = DATA.scatter.reduce((m, p) => Math.max(m, p.run_count), 1);
-  const radius  = (n) => 6 + Math.round((n / maxRuns) * 12);  // 6 .. 18
-  const data = DATA.scatter.map((p) => ({ ...p, r: radius(p.run_count) }));
+  // Treemap encoding:
+  //   tile area  ← quality (avg rating score, 0–1)
+  //   tile color ← cost (log-scaled cyan→red, since costs span ~25×)
+  // The treemap plugin handles layout only; the actual fill / logo / label
+  // are drawn by a custom plugin so we get rounded corners and a logo.
+  const points = DATA.scatter;
+  const costs  = points.map((p) => p.x).filter((c) => c > 0);
+  const logMin = Math.log(Math.min(...costs));
+  const logMax = Math.log(Math.max(...costs));
+  const span   = logMax - logMin || 1;
+  const colorForCost = (cost) => {
+    const t = (Math.log(cost) - logMin) / span;
+    return _lerpHex('#5ad1ff', '#ff6ad5', t);   // site cyan → magenta
+  };
+
+  // Score is 0–1; scale to ints so tiny scores don't round to 0 area.
+  const tree = points.map((p) => ({ ...p, _sz: Math.max(1, Math.round(p.y * 1000)) }));
+
+  // Re-render once any pending logo finishes decoding.
+  const requestRedraw = () => {
+    const c = _charts.get('scatterChart');
+    if (c) c.draw();
+  };
+  for (const p of tree) _getLogoImg(p.logo, requestRedraw);
+
+  // Custom tile renderer: rounded card, logo top-left, name + metrics inline.
+  const tilePlugin = {
+    id: 'treemapTiles',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      if (!meta) return;
+      const activeIdx = (chart.getActiveElements() || []).map((a) => a.index);
+
+      meta.data.forEach((el, i) => {
+        const props = el.getProps(['x', 'y', 'width', 'height'], true);
+        const { x, y, width: w, height: h } = props;
+        const d  = tree[i];
+        if (!d || w < 4 || h < 4) return;
+        const active = activeIdx.includes(i);
+        const radius = Math.min(8, w / 2, h / 2);
+
+        // Card body.
+        ctx.save();
+        _roundRectPath(ctx, x, y, w, h, radius);
+        ctx.fillStyle = colorForCost(d.x);
+        ctx.fill();
+        if (active) {
+          ctx.strokeStyle = '#0d121b';
+          ctx.lineWidth   = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // Layout decisions based on tile size.
+        const pad      = 8;
+        const minSide  = Math.min(w, h);
+        const logoSize = Math.max(12, Math.min(30, minSide * 0.30));
+
+        // Logo (top-left), recolored dark so it reads on the bright tile.
+        let textX = x + pad;
+        const textTop = y + pad;
+        const img = _getLogoImg(d.logo, requestRedraw);
+        if (img && img._loaded && !img._broken && w > logoSize + pad * 2 && h > logoSize + pad) {
+          const tinted = _tintedLogo(img, '#0d121b');
+          if (tinted) {
+            ctx.save();
+            ctx.globalAlpha = 0.92;
+            ctx.drawImage(tinted, x + pad, y + pad, logoSize, logoSize);
+            ctx.restore();
+          }
+          textX = x + pad + logoSize + pad;
+        }
+
+        // Text block: name on top, "score · spent" below if there's room.
+        const haveLogo = textX > x + pad + 1;
+        const nameFontSize = haveLogo
+          ? Math.max(9, Math.min(12, logoSize * 0.42))
+          : Math.max(9, Math.min(13, minSide * 0.16));
+        const metricFontSize = Math.max(8, nameFontSize - 2);
+
+        // Available width for the name + metric text block.
+        const textWidth = (x + w - pad) - textX;
+        if (textWidth < 30) { return; }
+
+        ctx.save();
+        // Clip to the tile so anything we measured-but-still-overflows gets
+        // cleanly trimmed by the rounded edge.
+        _roundRectPath(ctx, x, y, w, h, radius);
+        ctx.clip();
+
+        ctx.fillStyle    = '#0d121b';
+        ctx.textBaseline = 'top';
+        ctx.font         = `600 ${nameFontSize}px ${FONT}`;
+
+        // Wrap the name. Cap at 2 lines to keep tiles legible; the helper
+        // adds an ellipsis if even 2 lines aren't enough.
+        const name      = d.display_name || d.model;
+        const nameLineH = Math.round(nameFontSize * 1.15);
+        const nameLines = _wrapText(ctx, name, textWidth, 2);
+        const nameTopY  = haveLogo ? y + pad : textTop;
+        nameLines.forEach((line, idx) => {
+          ctx.fillText(line, textX, nameTopY + idx * nameLineH);
+        });
+
+        // Metric line: just the score. (Total spend is reserved for the
+        // tooltip — putting it on every tile clutters the visual.)
+        const metricTop = nameTopY + nameLines.length * nameLineH + 2;
+        if (metricTop + metricFontSize <= y + h - pad) {
+          const score = (d.y * 10).toFixed(1);
+          ctx.font      = `${metricFontSize}px ${FONT}`;
+          ctx.fillStyle = 'rgba(13,18,27,.78)';
+          ctx.fillText(score, textX, metricTop);
+        }
+        ctx.restore();
+      });
+    },
+  };
 
   makeChart('scatterChart', {
-    type: 'bubble',
+    type: 'treemap',
     data: {
       datasets: [{
-        data,
-        backgroundColor:      'rgba(90,209,255,.45)',
-        borderColor:          '#5ad1ff',
-        borderWidth:          1.5,
-        // Hover: swap the whole fill to magenta (and match the border to it)
-        // instead of adding a contrasting outline. Keeps border width constant
-        // so the bubble doesn't visually jump when moused over.
-        hoverBackgroundColor: 'rgba(255,106,213,.7)',
-        hoverBorderColor:     '#ff6ad5',
-        hoverBorderWidth:     1.5,
+        tree,
+        key:             '_sz',
+        // Hide the built-in fill / label — the plugin above draws the real
+        // tile. Keep a transparent backgroundColor so hit detection still
+        // covers the tile area.
+        backgroundColor: 'rgba(0,0,0,0)',
+        borderWidth:     0,
+        spacing:         4,
+        labels:          { display: false },
       }],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 4, right: 4, bottom: 4, left: 4 } },
+      // Make tiles feel like links: pointer cursor on hover, click → model page.
+      onHover: (event, elements, chart) => {
+        chart.canvas.style.cursor = elements.length ? 'pointer' : 'default';
+      },
+      onClick: (event, elements) => {
+        if (!elements.length) return;
+        const d = tree[elements[0].index];
+        if (!d) return;
+        // Slug = model id with HF-style "org/repo" → "org__repo" so the URL
+        // stays one segment. Mirrors _slug_model() in build_site.py.
+        const slug = String(d.model).replace(/\//g, '__');
+        navigate(`/models/${encodeURIComponent(slug)}/`);
+      },
       plugins: {
         legend: { display: false },
         tooltip: { ...COMMON_TOOLTIP,
           callbacks: {
-            title: (items) => items[0].raw.model,
+            title: (items) => {
+              const d = items[0].raw?._data;
+              if (!d) return '';
+              const provs = d.providers && d.providers.length
+                ? ' · ' + d.providers.join(', ')
+                : '';
+              return (d.display_name || d.model) + provs;
+            },
             label: (ctx) => {
-              const p = ctx.raw;
+              const d = ctx.raw?._data;
+              if (!d) return '';
+              const spent = d.total_cost_usd == null ? '—'
+                : '$' + (d.total_cost_usd < 1
+                  ? d.total_cost_usd.toFixed(4)
+                  : d.total_cost_usd.toFixed(2));
               return [
-                `score ${(p.y * 10).toFixed(1)} · $${p.x < 1 ? p.x.toFixed(4) : p.x.toFixed(2)} / stage`,
-                `${p.run_count} run${p.run_count === 1 ? '' : 's'} · ${p.stage_count} stage${p.stage_count === 1 ? '' : 's'} · ${p.test_count} test${p.test_count === 1 ? '' : 's'}`,
-                p.providers.length > 1 ? `via ${p.providers.join(', ')}` : `via ${p.providers[0]}`,
+                `score ${(d.y * 10).toFixed(1)}`,
+                `total spend ${spent}`,
+                `${d.run_count} run${d.run_count === 1 ? '' : 's'}`,
               ];
             },
           },
         },
       },
-      scales: {
-        x: { ...COMMON_SCALES,
-             title: { display: true, text: 'avg cost / stage', color: '#5d6878', font: { size: 10 } },
-             ticks: { ...COMMON_SCALES.ticks, callback: (v) => '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)) } },
-        y: { ...COMMON_SCALES, min: 0, max: 1,
-             ticks: { ...COMMON_SCALES.ticks, callback: (v) => (v * 10).toFixed(0) },
-             title: { display: true, text: 'avg rating score', color: '#5d6878', font: { size: 10 } } },
-      },
     },
+    plugins: [tilePlugin],
   });
 }
 

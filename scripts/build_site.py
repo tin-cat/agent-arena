@@ -488,7 +488,7 @@ def build_leaderboard(loaded: dict[str, LoadedTest]) -> list[dict]:
     return rows
 
 
-def build_scatter(loaded: dict[str, LoadedTest]) -> list[dict]:
+def build_scatter(loaded: dict[str, LoadedTest], models_catalog: dict[str, dict]) -> list[dict]:
     """One point per model — aggregates every run and stage of that model.
     X = avg cost per stage, Y = avg rating score, size = total runs."""
     by_model_stages:    dict[str, list[RunStage]]   = defaultdict(list)
@@ -513,18 +513,27 @@ def build_scatter(loaded: dict[str, LoadedTest]) -> list[dict]:
         score = rating_score(stages)
         costs = [s.cost_usd for s in stages if s.cost_usd is not None]
         avg_cost = sum(costs) / len(costs) if costs else None
-        if score is None or avg_cost is None:
+        # Skip if we have no cost data at all OR if the model's recorded spend
+        # is $0 (e.g. self-hosted runs where stages report 0). Pinning those
+        # to x=0 would cluster them against the y-axis and obscure the chart's
+        # whole point, which is the cost/quality trade-off.
+        if score is None or not avg_cost:
             continue
+        meta = models_catalog.get(model, {})
+        logo = _resolve_model_logo(model, meta)
         points.append({
-            "x":           avg_cost,
-            "y":           score,
-            "label":       model,
-            "model":       model,
-            "providers":   sorted(by_model_providers[model]),
-            "agents":      sorted(by_model_agents[model]),
-            "run_count":   len(by_model_runs[model]),
-            "stage_count": len(stages),
-            "test_count":  len(by_model_tests[model]),
+            "x":              avg_cost,
+            "y":              score,
+            "label":          model,
+            "model":          model,
+            "display_name":   meta.get("name") or model,
+            "logo":           logo,
+            "providers":      sorted(by_model_providers[model]),
+            "agents":         sorted(by_model_agents[model]),
+            "run_count":      len(by_model_runs[model]),
+            "stage_count":    len(stages),
+            "test_count":     len(by_model_tests[model]),
+            "total_cost_usd": sum(costs),
         })
     points.sort(key=lambda p: p["run_count"], reverse=True)
     return points
@@ -789,7 +798,7 @@ def _slug_model(model_id: str) -> str:
 # (for the "by <vendor>" chip) and the SPA falls back to a first-letter tile.
 _VENDOR_PATTERNS: list[tuple[re.Pattern, str, Optional[str]]] = [
     (re.compile(r"^(claude|sonnet|opus|haiku)",  re.I), "Anthropic", "/logos/providers/anthropic.svg"),
-    (re.compile(r"^(gpt-|o[3-9])",                re.I), "OpenAI",    None),
+    (re.compile(r"^(gpt-|o[3-9])",                re.I), "OpenAI",    "/logos/providers/openai.svg"),
     (re.compile(r"^gemini",                       re.I), "Google",    "/logos/providers/gemini.svg"),
     (re.compile(r"^grok",                         re.I), "xAI",       "/logos/providers/xai.svg"),
     (re.compile(r"^deepseek",                     re.I), "DeepSeek",  "/logos/providers/deepseek.svg"),
@@ -806,6 +815,28 @@ def _infer_vendor(model_id: str) -> tuple[Optional[str], Optional[str]]:
         if pattern.search(model_id):
             return name, logo
     return None, None
+
+
+# Model-id prefix → model-specific logo. Tried before the catalog entry's
+# logo and the vendor pattern so a model with its own brand (e.g. Claude's
+# orbital glyph) doesn't have to wear the parent company's mark.
+_MODEL_LOGO_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"^(claude|sonnet|opus|haiku)", re.I), "/logos/models/claude.svg"),
+]
+
+
+def _resolve_model_logo(model_id: str, catalog_entry: Optional[dict] = None) -> Optional[str]:
+    """Best logo for a given model id: prefer a model-specific glyph; fall back
+    to whatever the catalog has; finally try vendor inference."""
+    for pattern, path in _MODEL_LOGO_PATTERNS:
+        if pattern.match(model_id):
+            return path
+    if catalog_entry:
+        cat_logo = catalog_entry.get("logo")
+        if cat_logo:
+            return cat_logo
+    _, inferred = _infer_vendor(model_id)
+    return inferred
 
 
 def _model_stack_rollup(loaded: dict[str, LoadedTest],
@@ -870,12 +901,15 @@ def build_per_model(loaded: dict[str, LoadedTest], catalog: dict[str, dict],
         row["model"] = original
         row["stacks"] = stack_rollup.get(original, [])
         meta = catalog.get(original, {})
+        # Prefer a model-specific glyph (Claude orbital, etc.) over whatever
+        # the catalog set; falls back to catalog/vendor when none exists.
+        resolved_logo = _resolve_model_logo(original, meta)
+        if resolved_logo:
+            row["logo"] = resolved_logo
         vendor_name = meta.get("vendor")
         if not vendor_name:
-            inferred_name, inferred_logo = _infer_vendor(original)
+            inferred_name, _ = _infer_vendor(original)
             vendor_name = inferred_name
-            if inferred_logo and not row.get("logo"):
-                row["logo"] = inferred_logo
         row["vendor_name"] = vendor_name
     return rows
 
@@ -1497,7 +1531,7 @@ def render(out_dir: Path, github_url: str, site_url: str) -> None:
 
     summary      = build_summary(loaded)
     leaderboard  = build_leaderboard(loaded)
-    scatter      = build_scatter(loaded)
+    scatter      = build_scatter(loaded, models_catalog)
     theme_stats  = build_theme_stats(loaded)
     per_test     = build_per_test(loaded, stacks_catalog)
     per_agent    = build_per_agent(loaded, agents_catalog)
