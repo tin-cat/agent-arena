@@ -1692,7 +1692,9 @@ function mountScatter() {
       meta.data.forEach((el, i) => {
         const props = el.getProps(['x', 'y', 'width', 'height'], true);
         const { x, y, width: w, height: h } = props;
-        const d  = tree[i];
+        // The treemap layout reorders by area, so the element at index i is
+        // not necessarily tree[i]. Read the parsed datum off the dataset.
+        const d = chart.data.datasets[0].data[i]?._data;
         if (!d || w < 4 || h < 4) return;
         const active = activeIdx.includes(i);
         const radius = Math.min(8, w / 2, h / 2);
@@ -1796,9 +1798,12 @@ function mountScatter() {
       onHover: (event, elements, chart) => {
         chart.canvas.style.cursor = elements.length ? 'pointer' : 'default';
       },
-      onClick: (event, elements) => {
+      onClick: (event, elements, chart) => {
         if (!elements.length) return;
-        const d = tree[elements[0].index];
+        const e = elements[0];
+        // Treemap reorders by area; pull the datum from the dataset rather
+        // than indexing into the original `tree` array.
+        const d = chart.data.datasets[e.datasetIndex].data[e.index]?._data;
         if (!d) return;
         // Slug = model id with HF-style "org/repo" → "org__repo" so the URL
         // stays one segment. Mirrors _slug_model() in build_site.py.
