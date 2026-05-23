@@ -160,7 +160,7 @@ const routes = [
   { pat: /^\/leaderboard\/?$/,                               name: 'leaderboard',  handler: (_m, gen) => renderLeaderboard(gen) },
   { pat: /^\/tests\/?$/,                                     name: 'tests',        handler: (_m, gen) => renderTests(null, gen) },
   { pat: /^\/tests\/([^/]+)\/?$/,                            name: 'tests',        handler: (m, gen) => renderTests(m[1], gen) },
-  { pat: /^\/tests\/([^/]+)\/runs\/([^/]+)\/?$/,             name: 'tests',        handler: (m, gen) => renderRunDetail(m[1], m[2], 'tests', gen) },
+  { pat: /^\/tests\/([^/]+)\/runs\/([^/]+)\/?$/,             name: 'runs',         handler: (m, gen) => renderRunDetail(m[1], m[2], 'tests', gen) },
   { pat: /^\/runs\/?$/,                                      name: 'runs',         handler: (_m, gen) => renderRuns(gen) },
   { pat: /^\/runs\/([^/]+)\/([^/]+)\/?$/,                    name: 'runs',         handler: (m, gen) => renderRunDetail(m[1], m[2], 'runs', gen) },
   { pat: /^\/contributors\/?$/,                              name: 'contributors', handler: (_m, gen) => renderContributors(gen) },
@@ -438,11 +438,11 @@ function overviewLeaderHTML(rows) {
 }
 
 function feedItemHTML(c) {
-  return `<div class="feed-item">
+  return `<a class="feed-item" href="/tests/${esc(c.test_name)}/runs/${esc(c.run_id)}/">
     <span class="glyph">▸</span>
-    <span><a href="/contributors/${encodeURIComponent(c.handle)}/">${esc(c.handle)}</a> <span class="who">ran</span> <a href="/tests/${esc(c.test_name)}/runs/${esc(c.run_id)}/">${esc(c.test_name)}</a> <span class="who">on</span> ${esc(c.agent)}/${esc(c.model)}</span>
+    <span>${esc(c.handle)} <span class="who">ran</span> ${esc(c.test_name)} <span class="who">on</span> ${esc(c.agent)}/${esc(c.model)}</span>
     <span class="meta">${esc(c.date)}</span>
-  </div>`;
+  </a>`;
 }
 
 /* ─────────────────────────── 02 · LEADERBOARD ─────────────────────────── */
@@ -712,7 +712,7 @@ function catalogDetailHTML(kind, d) {
 
   const crossRows = d.cross.map((c) => `
     <tr class="clickable" onclick="rowNav(event, '/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}/')">
-      <td><a href="/${kind.routeOther}/${encodeURIComponent(c[kind.crossKey])}/"><code>${esc(c[kind.crossKey])}</code></a></td>
+      <td><code>${esc(c[kind.crossKey])}</code></td>
       <td class="num">${c.run_count}</td>
       <td class="num">${c.stage_count}</td>
       <td style="min-width:170px">${bar(c.avg_rating_score)}</td>
@@ -720,7 +720,7 @@ function catalogDetailHTML(kind, d) {
 
   const testRows = d.tests.map((t) => `
     <tr class="clickable" onclick="rowNav(event, '/tests/${encodeURIComponent(t.test_name)}/')">
-      <td><a href="/tests/${encodeURIComponent(t.test_name)}/">${esc(t.test_name)}</a></td>
+      <td>${esc(t.test_name)}</td>
       <td class="t-mute">${esc(t.test_title)}</td>
       <td class="num">${t.run_count}</td>
       <td class="num">${t.stage_count}</td>
@@ -781,7 +781,7 @@ function catalogDetailHTML(kind, d) {
           <thead><tr><th>stack</th><th class="num">runs</th><th class="num">stages</th><th>avg score</th></tr></thead>
           <tbody>${d.stacks.map((s) => `
             <tr class="clickable" onclick="rowNav(event, '/stacks/${encodeURIComponent(s.stack)}/')">
-              <td><a href="/stacks/${encodeURIComponent(s.stack)}/">${esc(s.stack_name || s.stack)}</a></td>
+              <td>${esc(s.stack_name || s.stack)}</td>
               <td class="num">${s.run_count}</td>
               <td class="num">${s.stage_count}</td>
               <td style="min-width:170px">${bar(s.avg_rating_score)}</td>
@@ -892,7 +892,7 @@ function runsTableHTML(runs, opts = {}) {
     <tbody>${runs.map((r) => `
       <tr class="clickable" onclick="rowNav(event, '/tests/${esc(r.test_name)}/runs/${esc(r.run_id)}/')">
         ${showTest ? `<td>${esc(r.test_name)}</td>` : ''}
-        <td><a class="author-inline" href="/contributors/${encodeURIComponent(r.contributor_handle)}/">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></a></td>
+        <td><span class="author-inline">${r.contributor_avatar ? `<img class="avatar-thumb" src="${esc(r.contributor_avatar)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}<span>${esc(r.contributor_handle)}</span></span></td>
         <td>${esc(r.agent)} · <b>${esc(r.model)}</b> <span class="pill muted">${esc(r.provider)}</span></td>
         <td>${ratingDots(r.stages, r.stages_total)}</td>
         <td style="min-width:170px">${bar(r.avg_rating_score)}</td>
@@ -950,7 +950,7 @@ async function renderRunDetail(testName, runId, parentRoute, gen) {
       <span class="cur">${esc(runId)}</span>
     </div>
 
-    ${viewHead(run.run_id, `${esc(run.agent)} · ${esc(run.model)}`, '')}
+    ${viewHead(`${testName} run by ${run.contributor_handle}`, '', esc(run.run_id))}
 
     <div class="run-detail">
       <div class="panel">
@@ -1027,7 +1027,7 @@ function runStageTableHTML(run, test) {
     <tbody>${run.stages.map((s, i) => `
       <tr>
         <td class="rank">${String(i + 1).padStart(2, '0')}</td>
-        <td><b>${esc(s.id)}</b></td>
+        <td class="stage-cell"><b>${esc(s.id)}</b>${s.source_path ? `<a class="src-btn" href="${esc(DATA.github_url)}/tree/main/${esc(s.source_path)}" rel="noopener" title="View source on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2.9-.3 2-.4 3-.4s2.1.1 3 .4c2.3-1.6 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg><span>source</span></a>` : ''}</td>
         <td>${themeBy[s.id] ? `<span class="pill magenta">${esc(themeBy[s.id])}</span>` : '—'}</td>
         <td><span class="dot" style="background:${RATING_COLOR[s.rating]}; margin-right:6px"></span>${esc(s.rating)}</td>
         <td class="num">${fmtDuration(s.duration_sec)}</td>
@@ -1105,8 +1105,8 @@ function recentContribHTML(rows) {
     <tbody>${rows.map((c) => `
       <tr class="clickable" onclick="rowNav(event, '/tests/${esc(c.test_name)}/runs/${esc(c.run_id)}/')">
         <td class="t-mute">${esc(c.date)}</td>
-        <td><a href="/contributors/${encodeURIComponent(c.handle)}/">${esc(c.handle)}</a></td>
-        <td><a href="/tests/${esc(c.test_name)}/">${esc(c.test_name)}</a> · <code>${esc(c.run_id)}</code></td>
+        <td>${esc(c.handle)}</td>
+        <td>${esc(c.test_name)} · <code>${esc(c.run_id)}</code></td>
         <td>${esc(c.agent)} · <b>${esc(c.model)}</b> <span class="pill muted">${esc(c.provider)}</span></td>
       </tr>`).join('')}
     </tbody>
@@ -1183,7 +1183,7 @@ async function renderContributorProfile(handle, gen) {
             <thead><tr><th>test</th><th class="num">runs</th></tr></thead>
             <tbody>${[...tests.values()].sort((a, b) => b.count - a.count).map((t) => `
               <tr class="clickable" onclick="rowNav(event, '/tests/${esc(t.name)}/')">
-                <td><a href="/tests/${esc(t.name)}/">${esc(t.title)}</a> <span class="pill muted">${esc(t.name)}</span></td>
+                <td>${esc(t.title)} <span class="pill muted">${esc(t.name)}</span></td>
                 <td class="num">${t.count}</td>
               </tr>`).join('')}
             </tbody>
@@ -1246,7 +1246,7 @@ async function renderContributorProfile(handle, gen) {
               <thead><tr><th>test</th><th>domain</th><th class="num">stages</th><th class="num">runs</th><th class="num">top score</th></tr></thead>
               <tbody>${authored.map((t) => `
                 <tr class="clickable" onclick="rowNav(event, '/tests/${esc(t.name)}/')">
-                  <td><a href="/tests/${esc(t.name)}/">${esc(t.title)}</a> <span class="pill muted">${esc(t.name)}</span></td>
+                  <td>${esc(t.title)} <span class="pill muted">${esc(t.name)}</span></td>
                   <td>${t.domain ? `<span class="pill">${esc(t.domain)}</span>` : '<span class="t-mute">—</span>'}</td>
                   <td class="num">${t.stages_total}</td>
                   <td class="num">${t.run_count}</td>

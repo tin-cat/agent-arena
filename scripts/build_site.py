@@ -596,6 +596,11 @@ def _run_summary(lr: LoadedRun, lt: LoadedTest) -> dict:
                 "tokens_out": s.tokens_out,
                 "cost_usd": s.cost_usd,
                 "notes": s.notes,
+                "source_path": (
+                    f"tests/{lt.test.name}/runs/{lr.run_id}/{s.id}"
+                    if (TESTS_DIR / lt.test.name / "runs" / lr.run_id / s.id).is_dir()
+                    else None
+                ),
             }
             for s in lr.run.stages
         ],
