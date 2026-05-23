@@ -1029,6 +1029,12 @@ a.metric {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.catalog-tabs.mosaic .catalog-tab-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.3;
+}
 .catalog-tab.active .catalog-tab-name { color: var(--cyan); text-shadow: var(--glow-cyan); }
 .catalog-tab-type {
   font-size: 10px;
