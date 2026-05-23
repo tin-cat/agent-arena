@@ -8,7 +8,7 @@ stages:
   - id: stage-1-simulation
     theme: bootstrap
     prompt: |
-      Build a real-time, physics-accurate simulation of the sinking of the Titanic. Use a 2D side-view as the physics ground truth. Rendering must be 2D Canvas/SVG, not 3D. The source of truth must be a  2D physics state. It should run in a physics engine that simulates the relevant conditions, variables and anything else that results in a plausible approximation to the way the Titanic really sank, as has been thoroughly documented.
+      Build a real-time, physics-accurate simulation of the sinking of the Titanic. Use a 2D side-view as the physics ground truth. Rendering must be 2D Canvas/SVG, not 3D. The source of truth must be a 2D physics state. It should run in a physics engine that simulates the relevant conditions, variables and anything else that results in a plausible approximation to the way the Titanic really sank, as has been thoroughly documented.
 
       Hard, non-negotiable requirements. Stop if you cannot strictly fulfill all of them completely. Failing to fulfill all of them will be considered a failure:
 
