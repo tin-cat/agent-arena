@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Titanic — Physics-Accurate Sinking Simulation</title>
+	<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+	<div id="scene">
+		<canvas id="canvas"></canvas>
+
+		<div id="info-panel" class="panel">
+			<h2>RMS Titanic — Sinking</h2>
+			<div class="info-row"><span>Simulated time</span><span id="sim-time">+00:00:00</span></div>
+			<div class="info-row"><span>Wall clock</span><span id="wall-time">0.0 s</span></div>
+			<div class="info-row"><span>Time multiplier</span><span id="time-mult">1.0×</span></div>
+			<div class="info-row"><span>Water aboard</span><span id="water-mass">0 t</span></div>
+			<div class="info-row"><span>Inflow rate</span><span id="inflow">0 t/s</span></div>
+			<div class="info-row"><span>Hull pitch</span><span id="bow-angle">0.0°</span></div>
+			<div class="info-row"><span>Bow depth</span><span id="bow-depth">0.0 m</span></div>
+			<div class="info-row"><span>Hull status</span><span id="hull-status">Intact</span></div>
+			<div class="info-row"><span>Funnels lost</span><span id="funnels-lost">0 / 4</span></div>
+			<div class="info-row"><span>Fragments resting</span><span id="resting">0</span></div>
+			<div class="info-row"><span>Phase</span><span id="phase">Iceberg struck</span></div>
+		</div>
+
+		<div id="controls" class="panel">
+			<button id="play-pause" title="Pause / resume">Pause</button>
+			<button id="restart" title="Restart simulation">Restart</button>
+			<label>
+				<span>Time mult</span>
+				<input type="range" id="mult-slider" min="0" max="1000" step="1" value="0" />
+				<span id="mult-slider-val">Auto</span>
+			</label>
+		</div>
+
+		<div id="legend" class="panel">
+			<div><span class="swatch" style="background:#88a2c8"></span>Hull plating</div>
+			<div><span class="swatch" style="background:#3b5c8a"></span>Inner compartments</div>
+			<div><span class="swatch" style="background:#2c6cb0"></span>Floodwater (per compartment)</div>
+			<div><span class="swatch" style="background:#d8b66a"></span>Funnel</div>
+			<div><span class="swatch" style="background:#5a4734"></span>Seafloor (3,800 m)</div>
+		</div>
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+	<script type="module" src="js/main.js"></script>
+</body>
+</html>

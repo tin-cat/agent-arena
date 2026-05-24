@@ -10,22 +10,34 @@ stages:
     prompt: |
       Build a real-time, physics-accurate simulation of the sinking of the Titanic. Use a 2D side-view as the physics ground truth. Rendering must be 2D Canvas/SVG, not 3D. The source of truth must be a 2D physics state. It should run in a physics engine that simulates the relevant conditions, variables and anything else that results in a plausible approximation to the way the Titanic really sank, as has been thoroughly documented.
 
-      Hard, non-negotiable requirements. Stop if you cannot strictly fulfill all of them completely. Failing to fulfill all of them will be considered a failure:
+      You should investigate the real timeline of events of the Titanic sinking and ensure the resulting simulated events sufficiently approximate them.
+
+      The following is a list of hard, non-negotiable requirements. Stop if you cannot strictly fulfill all of them completely. Failing to fulfill all of them will be considered a failure:
 
       - Use a real, general-purpose 2D rigid-body physics engine like Matter.js, Planck.js or Rapier in 2D mode. Do not write your own rigid-body engine.
       - Nothing is scripted, no event-keyed code, the entire simulation runs naturally without scripted intervention, from a given starting point to an end that sufficiently approximates the real events.
-      - The ship is composed of an outher body representing the hull, breakable at any point. Inside the other body, there are bodies for each of the ship's inner hulls, thus creating an approximation of the Titanic's hull and main compartments. Inner compartments are joined to each other and to the outher hull with breakable joints. Joints have a finite maximum load before they fail. The hull split's location and time must emerge from joint failures under the bending stress produced by flood-driven mass redistribution between inner compartments, they should not be specified anywhere in the code or anywhere else.
+      - The ship is composed of an outher body representing the hull, breakable at any point. Inside the other body, there are bodies for each of the ship's inner hulls, thus creating an approximation of the Titanic's hull and its main inner compartments. Inner compartments are joined to each other and to the outher hull with breakable joints. Joints have a finite maximum load before they fail. The hull split's location and time must emerge from joint failures under the bending stress produced by flood-driven mass redistribution between inner compartments, they should not be specified anywhere in the code or anywhere else.
       - The simulation starts just after the collision with the iceberg, with the corresponding compartments already breached and leaking water, and goes on until the ship (or what's left of it) rests static on the sea floor.
-      - The ship sizes and proportions, the water drag and currents, the seafloor depth and other similar parameters are all real numbers from the real incident.
+      - The ship sizes, mass and weight, the seafloor depth and other similarly relevant measurements, parameters and values are all real numbers taken from the real incident, resulting in a simulation based on real-life, real-scale parameters.
       - Buoyancy is simulated by the physics engine.
-      - Water inside the ship is simulated as continuous mass per compartment. Each compartment is a bounded by hull and bulkhead walls. Water enters through any wall whose plating has failed at a rate given by Torricelli's law using the actual current pressure head. When local water level exceeds a bulkhead height, water overflows into the adjacent compartment via the same fluid-mechanics inflow. It would be great if you can visually represent the height of the flood water in each compartment.
-      - Funnels are physically attached to specific hull segments by joints with finite strength. They fall when the joint fails under load same mechanism as the hull break.
-      - If the hull splits, the pieces are independent compound bodies in the same world. They can collide with each other. Both sink to the seafloor, which is a static body in the engine.
-      - Water effects in the sinking bodies is simulated in a way that currents and drag affect the bodies movement, which may land in different places on the seafloor.
-      - The time multiplier is derived continuously from scene activity. Pick a metric that captures "how much is changing right now": the maximum rate of change of bending stress across all joints, or the kinetic-energy time derivative, or the maximum body velocity. The multiplier inversely tracks the metric, low-pass-filtered to prevent jitter, clamped to a sensible range (1x-300x). No lookup table keyed on time. When everything is calm (slow flooding), the multiplier rises automatically; when stress is spiking (the break, the plunge, the seafloor impact), it falls automatically.
+      - There is no need to simulate sea currents or waves.
+      - The sea density and drag must be simulated so it affects the way the ship sinks.
+      - Water inside the ship is simulated as a mass per compartment. Each compartment is a bounded by hull and bulkhead walls. Water enters through any wall whose plating has failed at a rate given by Torricelli's law using the actual current pressure head. When local water level exceeds a bulkhead height, water overflows into the adjacent compartment via the same fluid-mechanics inflow. It would be great if you can visually represent the height and level of the water flooding each compartment.
+      - Funnels are physically attached to specific hull segments by joints with finite strength and are also accurately simulated. They collapse and/or break as in the real events.
+      - If the hull or any other pieces split, the pieces are independent compound bodies in the same world. They can collide with each other. All sink to the seafloor (which is a static body in the engine) as in the real events.
+      - The time multiplier is derived continuously from scene activity. Pick a metric that captures "how much is changing right now": the maximum rate of change of bending stress across all joints, or the kinetic-energy time derivative, or the maximum body velocity. The multiplier inversely tracks the metric, low-pass-filtered to prevent jitter, clamped to a sensible range (1x-1000x). No lookup table keyed on time. When everything is calm (slow flooding), the multiplier rises automatically; when stress is spiking (the break, the plunge, the seafloor impact), it falls automatically.
+      - Adjust the time multiplier in a way that the final entire simulation lasts around 1 minute.
+      - Make the time multiplier a variable you can set to a specific multiplier that holds during the entire run, so if and when you run simulations to check the results of your work, you can set it to its maximum value so the test only takes a few seconds or even less, instead of having to watch the entire simulation.
       - The following should not be tunable constants: when and if the break happens, where the break happens, what time the funnel falls, what the time multiplier is at any given simulated moment.
       - The camera should always frame the ship so it nicely fits in the entire screen, allowing the viewer to see the details closely, even while the ship is sinking, until its impact on the seafloor. If the ship breaks into pieces, the camera may zoom away so all fragments are always framed into view.
 
       The resulting visualization should be informative, educational and easy to understand and watch. For example: Even though the events took place at night, make it so the entire scene is clearly visible.
+
+      Some soft requirements that you can implement if you decide they do not add unnecessary complexity or hurt the simulation precision:
+
+      - Add a panel showing some useful realtime information, like the simulation time, the amount of water that entered the ship and/or other interesting parameters.
+      - Use images or textures over the physics objects so the ship looks like the real one.
+      - Add visual flair just to make it look better, for example: A beautiful sky, stars, the moon, an underwater visual effect, smoke in the funnels, lights in the ship windows, etc.
+      - Add a panel with some controls for the user, like a play/pause button, a time multiplier manual adjustment slider, etc.
 
       Add a README.md documenting the technical architecture of how everything works.

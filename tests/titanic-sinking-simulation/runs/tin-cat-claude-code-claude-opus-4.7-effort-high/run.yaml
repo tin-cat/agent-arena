@@ -1,0 +1,20 @@
+contributor_url: https://github.com/tin-cat
+date: 2026-05-24
+agent:
+  name: claude-code
+  plan: max
+provider: anthropic
+model: claude-opus-4.7
+settings:
+  effort: high
+stages:
+  - id: stage-1-simulation
+    duration_sec: 4644
+    tokens_in: 800
+    tokens_out: 315100
+    cost_usd: 33.17
+    rating: partial
+    notes: 'Events run too slow: real sinking took 5 minutes from surface to bottom, it takes many hours in the simulation,
+      an many parts even stay at sea level after many simulated hours. Overall breaking conditions look approximate enough.
+      Sea depth is wrongly displayed. Auto framing to center the ship on view seems to include also other objects and thus
+      the ship is never centered.'
