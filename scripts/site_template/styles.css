@@ -1158,7 +1158,7 @@ body.nav-open .nav-backdrop { display: block; }
   .hamburger { display: inline-flex; }
   .titlebar  { padding: 0 10px; gap: 4px; }
   .titlebar-right { gap: 8px; }
-  .gh-link-cta { display: none; }            /* keep titlebar uncluttered */
+  .gh-link:not(.gh-link-cta) { display: none; }  /* keep titlebar uncluttered; prefer contribute CTA over github */
   .brand-name  { font-size: 18px; }
   .brand-sub   { display: none; }
   .main        { padding: 16px; }
@@ -1186,6 +1186,9 @@ body.nav-open .nav-backdrop { display: block; }
   }
   body.nav-open .sidebar { transform: translateX(0); }
   .sidebar-footer { display: flex; }
+}
+@media (max-width: 480px) {
+  .cta-extra { display: none; }                  /* "+ contribute your tests" → "+ contribute" on phones */
 }
 
 /* ════════════════════════════════════════════════════════════════════════
