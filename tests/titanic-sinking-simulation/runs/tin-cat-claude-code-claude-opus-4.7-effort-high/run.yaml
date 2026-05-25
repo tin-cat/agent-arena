@@ -15,6 +15,6 @@ stages:
     cost_usd: 33.17
     rating: partial
     notes: 'Events run too slow: real sinking took 5 minutes from surface to bottom, it takes many hours in the simulation,
-      an many parts even stay at sea level after many simulated hours. Overall breaking conditions look approximate enough.
-      Sea depth is wrongly displayed. Auto framing to center the ship on view seems to include also other objects and thus
-      the ship is never centered.'
+      and many parts even stay at sea level after many simulated hours. Funnels stay afloat indefinitely. Overall breaking
+      conditions look approximate enough. Sea depth is wrongly displayed and auto framing to center the ship on view does
+      not work on high DPI displays.
