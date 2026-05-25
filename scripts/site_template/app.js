@@ -181,14 +181,12 @@ function parsePath() {
   return location.pathname || '/';
 }
 
-// Programmatic navigation — used by onclick handlers on table rows and by the
-// click delegator below for in-page <a href="/..."> links. Avoids a full page
-// reload, updates the URL via pushState, then triggers route().
+// Programmatic navigation — used by onclick handlers on table rows and the
+// keyboard shortcuts. Each route URL has its own pre-rendered HTML file, so a
+// real navigation is correct: the shell loads, JS re-renders the view from the
+// URL.
 function navigate(path) {
-  if (path !== location.pathname + location.search) {
-    history.pushState(null, '', path);
-  }
-  route();
+  location.href = path;
 }
 window.navigate = navigate;
 
@@ -244,26 +242,6 @@ function highlightNav(name) {
     el.classList.toggle('active', el.dataset.route === name);
   }
 }
-
-// Back/forward buttons → re-route from the new pathname.
-window.addEventListener('popstate', route);
-
-// Intercept clicks on internal links so we navigate via the History API
-// instead of doing a full page reload. Modifier-clicked or new-tab clicks fall
-// through to the browser's default behaviour.
-document.addEventListener('click', (e) => {
-  if (e.defaultPrevented) return;
-  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-  const a = e.target.closest('a');
-  if (!a) return;
-  const href = a.getAttribute('href');
-  if (!href || !href.startsWith('/')) return;       // external or fragment
-  if (a.target && a.target !== '_self') return;
-  if (a.hasAttribute('download')) return;
-  if (a.host && a.host !== location.host) return;   // resolved cross-origin
-  e.preventDefault();
-  navigate(href);
-});
 
 /* ════════════════════════════════════════════════════════════════════════
    Views
