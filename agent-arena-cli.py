@@ -3,6 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "typer>=0.12",
+#     "click>=8.1",
 #     "rich>=13.7",
 #     "pydantic>=2.6",
 #     "ruamel.yaml>=0.18",
@@ -32,6 +33,9 @@ from pathlib import Path
 
 _DEPS = (
     "typer>=0.12",
+    # typer>=0.26 dropped its dependency on click, but we import click directly
+    # (for the help/command-walking code), so pin it explicitly.
+    "click>=8.1",
     "rich>=13.7",
     "pydantic>=2.6",
     "ruamel.yaml>=0.18",
@@ -43,6 +47,7 @@ _VENV_PY = _VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/py
 
 def _have_deps() -> bool:
     try:
+        import click        # noqa: F401
         import pydantic     # noqa: F401
         import rich         # noqa: F401
         import ruamel.yaml  # noqa: F401
