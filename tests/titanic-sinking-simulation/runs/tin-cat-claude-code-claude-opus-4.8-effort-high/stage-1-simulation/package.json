@@ -1,0 +1,17 @@
+{
+  "name": "titanic-sim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-time, physics-accurate 2D simulation of the sinking of the Titanic",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node test/run-headless.js",
+    "test:browser": "node test/capture.js"
+  },
+  "dependencies": {
+    "planck": "1.4.2"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.43.1"
+  }
+}

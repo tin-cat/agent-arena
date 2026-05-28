@@ -1,0 +1,19 @@
+contributor_url: https://github.com/tin-cat
+date: 2026-05-28
+agent:
+  name: claude-code
+  plan: max
+provider: anthropic
+model: claude-opus-4.8
+settings:
+  effort: high
+stages:
+  - id: stage-1-simulation
+    duration_sec: 4458
+    tokens_in: 24600
+    tokens_out: 251400
+    cost_usd: 66.03
+    rating: good
+    notes: Auto time multiplier fails to slow down when the crack happens. Otherwise, vast improvement from Opus 4.7,
+      with a reasonably accurate sinking sequence that clearly attains all the main sinking events. The funnels do not
+      collapse until the end.

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RMS Titanic — Physics Simulation of the Sinking</title>
+<style>
+	:root {
+		--panel: rgba(8, 18, 34, 0.72);
+		--panel-b: rgba(120, 170, 210, 0.25);
+		--ink: #dce8f5;
+		--accent: #6fb6e6;
+	}
+	* { box-sizing: border-box; }
+	html, body { margin: 0; height: 100%; overflow: hidden; background: #05111f; }
+	body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+	#scene { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+
+	.panel {
+		position: fixed; background: var(--panel); border: 1px solid var(--panel-b);
+		border-radius: 10px; padding: 12px 14px; backdrop-filter: blur(6px);
+		box-shadow: 0 6px 24px rgba(0,0,0,0.35); font-size: 13px; line-height: 1.5;
+	}
+	#info { top: 14px; left: 14px; min-width: 248px; }
+	#info h1 { margin: 0 0 2px; font-size: 15px; letter-spacing: 0.4px; }
+	#info .sub { margin: 0 0 10px; font-size: 11px; opacity: 0.65; }
+	#info .status { margin: 8px 0 2px; font-weight: 600; color: var(--accent); min-height: 18px; }
+	.grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; }
+	.grid .k { opacity: 0.7; }
+	.grid .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+	#comppanel { top: 14px; right: 14px; width: 220px; max-height: 78vh; overflow: auto; }
+	#comppanel h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+	.comprow { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 11px; }
+	.cname { width: 86px; opacity: 0.85; white-space: nowrap; }
+	.cbar { flex: 1; height: 9px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden; }
+	.cbar i { display: block; height: 100%; width: 0%; background: #3f93c8; transition: width 0.12s linear; }
+
+	#controls { bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; }
+	#controls button {
+		background: rgba(40, 80, 120, 0.6); color: var(--ink); border: 1px solid var(--panel-b);
+		border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
+	}
+	#controls button:hover { background: rgba(60, 110, 160, 0.75); }
+	.slabel { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+	#multSlider { width: 180px; }
+	.chk { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+	#multManual { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); }
+	.legend { position: fixed; bottom: 14px; left: 14px; font-size: 10px; opacity: 0.5; max-width: 240px; }
+</style>
+</head>
+<body>
+	<canvas id="scene"></canvas>
+
+	<div id="info" class="panel">
+		<h1>RMS Titanic — Sinking</h1>
+		<p class="sub">Real-scale 2D rigid-body physics (Planck.js / Box2D)</p>
+		<div class="status" id="status">Flooding forward compartments</div>
+		<div class="grid">
+			<div class="k">Ship's clock</div><div class="v" id="clock">23:40:00</div>
+			<div class="k">Sim time</div><div class="v" id="simElapsed">0.0 min</div>
+			<div class="k">Wall time</div><div class="v" id="wall">0.0 s</div>
+			<div class="k">Time multiplier</div><div class="v" id="mult">1x</div>
+			<div class="k">Water admitted</div><div class="v" id="water">0 kt</div>
+			<div class="k">Total flooded</div><div class="v" id="flooded">0%</div>
+			<div class="k">Trim angle</div><div class="v" id="trim">0°</div>
+			<div class="k">Deepest point</div><div class="v" id="depth">0 m</div>
+			<div class="k">Hull pieces</div><div class="v" id="pieces">1</div>
+		</div>
+	</div>
+
+	<div id="comppanel" class="panel">
+		<h2>Compartment flooding</h2>
+		<div id="comps"></div>
+	</div>
+
+	<div id="controls" class="panel">
+		<button id="playPause">⏸ Pause</button>
+		<button id="restart">⟳ Restart</button>
+		<div class="slabel">
+			Speed
+			<input type="range" id="multSlider" min="0" max="3" step="0.01" value="1" />
+			<span id="multManual">auto</span>
+		</div>
+		<label class="chk"><input type="checkbox" id="autoMult" checked /> auto</label>
+	</div>
+
+	<div class="legend">Night scene brightened for visibility. Collision 23:40 · founders ~02:20 · wreck at 3,800 m.</div>
+
+	<script src="vendor/planck.min.js"></script>
+	<script src="src/sim-core.js"></script>
+	<script src="src/render.js"></script>
+	<script src="src/main.js"></script>
+</body>
+</html>
