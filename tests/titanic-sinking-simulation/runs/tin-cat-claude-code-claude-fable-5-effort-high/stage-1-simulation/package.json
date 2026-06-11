@@ -1,0 +1,20 @@
+{
+  "name": "titanic",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/run.js --quiet",
+    "start": "node tools/serve.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "planck": "^1.4.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}
