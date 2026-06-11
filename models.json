@@ -1,5 +1,15 @@
 [
   {
+    "id": "claude-fable-5",
+    "name": "Claude Fable 5",
+    "description": "Anthropic's most capable model, in the new Mythos-class tier above Opus; built for the hardest reasoning and long-horizon agentic work, priced above Opus.",
+    "homepage": "https://www.anthropic.com/news/claude-fable-5-mythos-5",
+    "category": "closed-hosted",
+    "vendor": "Anthropic",
+    "logo": "/logos/providers/anthropic.svg",
+    "aliases": ["fable-5", "fable"]
+  },
+  {
     "id": "claude-opus-4.8",
     "name": "Claude Opus 4.8",
     "description": "Anthropic's top-tier flagship; strongest reasoning and long-horizon agentic coding, highest cost.",
