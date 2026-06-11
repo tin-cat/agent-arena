@@ -1,0 +1,19 @@
+contributor_url: https://github.com/tin-cat
+date: 2026-06-11
+agent:
+  name: claude-code
+  plan: Max
+provider: anthropic
+model: claude-fable-5
+settings:
+  effort: high
+stages:
+  - id: stage-1-simulation
+    duration_sec: 4305
+    tokens_in: 21900
+    tokens_out: 245900
+    cost_usd: 4047.0
+    rating: excellent
+    notes: Much better simulation accuracy and UI than previous claude models, takes into account more parameters like 
+      seafloor consistency. Overall sinking sequence mimics correctly historic events except final position of fragments
+      in the seabed, hull break takes place underwater.
